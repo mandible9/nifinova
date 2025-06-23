@@ -195,8 +195,13 @@ export class MemStorage implements IStorage {
     for (const data of insertData) {
       const id = this.currentOptionsChainId++;
       const option: OptionsChain = {
-        ...data,
         id,
+        strikePrice: data.strikePrice,
+        callLTP: data.callLTP || null,
+        callVolume: data.callVolume || null,
+        putLTP: data.putLTP || null,
+        putVolume: data.putVolume || null,
+        expiryDate: data.expiryDate,
         lastUpdated: new Date(),
       };
       const key = `${data.strikePrice}-${data.expiryDate.getTime()}`;

@@ -1,10 +1,26 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { aiSignalsService } from "./services/ai-signals";
 import { zerodhaService } from "./services/zerodha";
 import { whatsappService } from "./services/whatsapp";
 import { insertWhatsappUserSchema } from "@shared/schema";
+
+// Extend Express Request interface to include session
+declare module 'express-session' {
+  interface SessionData {
+    userId?: number;
+    username?: string;
+  }
+}
+
+interface AuthenticatedRequest extends Request {
+  session: {
+    userId?: number;
+    username?: string;
+    destroy: (callback: (err: any) => void) => void;
+  } & any;
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
@@ -18,7 +34,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Simple session management
-      req.session = { userId: user.id, username: user.username };
+      (req.session as any).userId = user.id;
+      (req.session as any).username = user.username;
       
       res.json({ user: { id: user.id, username: user.username } });
     } catch (error) {
@@ -27,13 +44,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/auth/logout", (req, res) => {
-    req.session = null;
-    res.json({ message: "Logged out successfully" });
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ message: "Could not log out" });
+      }
+      res.json({ message: "Logged out successfully" });
+    });
   });
 
   app.get("/api/auth/me", (req, res) => {
-    if (req.session?.userId) {
-      res.json({ user: { id: req.session.userId, username: req.session.username } });
+    const session = req.session as any;
+    if (session?.userId) {
+      res.json({ user: { id: session.userId, username: session.username } });
     } else {
       res.status(401).json({ message: "Not authenticated" });
     }

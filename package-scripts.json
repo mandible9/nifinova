@@ -1,0 +1,19 @@
+{
+  "scripts": {
+    "setup": "npm install && echo 'Setup complete! Run: npm start'",
+    "start": "npm run dev",
+    "dev": "NODE_ENV=development tsx server/index.ts",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "quickstart": {
+    "steps": [
+      "1. Extract project files",
+      "2. Open terminal in project folder", 
+      "3. Run: npm install",
+      "4. Run: npm run dev",
+      "5. Open: http://localhost:5000",
+      "6. Login: admin/admin"
+    ]
+  }
+}
