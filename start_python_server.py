@@ -18,7 +18,7 @@ if __name__ == "__main__":
     
     print("Starting Nifty AI Trading Assistant...")
     print("Real-time updates: Every 1 second")
-    print("Access at: http://localhost:5001")
+    print("Access at: http://localhost:5000")
     print("Login: admin/admin")
     print("Press Ctrl+C to stop")
     
@@ -26,7 +26,7 @@ if __name__ == "__main__":
         socketio.run(
             app, 
             host='0.0.0.0', 
-            port=5001, 
+            port=5000, 
             debug=False, 
             allow_unsafe_werkzeug=True,
             use_reloader=False,
