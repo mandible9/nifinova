@@ -3,13 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Nifty AI Trading Assistant{% endblock %}</title>
+    <title>{% block title %}PKRSOLUTION - AI Trading Platform{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
         .pulse-green { animation: pulse-green 1s ease-in-out; }
         .pulse-red { animation: pulse-red 1s ease-in-out; }
+        
         @keyframes pulse-green {
             0%, 100% { background-color: transparent; }
             50% { background-color: rgb(220, 252, 231); }
@@ -17,6 +25,48 @@
         @keyframes pulse-red {
             0%, 100% { background-color: transparent; }
             50% { background-color: rgb(254, 226, 226); }
+        }
+        
+        .pkr-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .pkr-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .pkr-logo {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+        }
+        
+        .signal-card {
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(5px);
+        }
+        
+        .signal-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        .stats-card {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.8) 100%);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .stats-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
         }
     </style>
 </head>
@@ -89,27 +139,40 @@
         
         function createSignalElement(signal) {
             const div = document.createElement('div');
-            div.className = `border-l-4 p-4 rounded-r-lg relative ${
-                signal.type === 'CALL' ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'
+            div.className = `signal-card rounded-2xl p-5 border-l-4 ${
+                signal.type === 'CALL' 
+                    ? 'border-green-500 bg-gradient-to-r from-green-50 to-green-100' 
+                    : 'border-red-500 bg-gradient-to-r from-red-50 to-red-100'
             }`;
             
             div.innerHTML = `
-                <div class="flex items-center justify-between mb-2">
-                    <div class="flex items-center space-x-2">
-                        <span class="px-2 py-1 text-xs font-bold text-white rounded ${
-                            signal.type === 'CALL' ? 'bg-green-600' : 'bg-red-600'
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center space-x-3">
+                        <span class="px-3 py-1 text-xs font-bold text-white rounded-full shadow-lg ${
+                            signal.type === 'CALL' ? 'bg-gradient-to-r from-green-500 to-green-600' : 'bg-gradient-to-r from-red-500 to-red-600'
                         }">${signal.type}</span>
-                        <span class="font-medium">${signal.strike_price} ${signal.type === 'CALL' ? 'CE' : 'PE'}</span>
+                        <span class="font-bold text-lg text-gray-800">${signal.strike_price} ${signal.type === 'CALL' ? 'CE' : 'PE'}</span>
                     </div>
-                    <span class="font-bold text-sm ${
-                        signal.confidence >= 90 ? 'text-green-600' : 
-                        signal.confidence >= 75 ? 'text-orange-600' : 'text-gray-600'
-                    }">${signal.confidence}% Confidence</span>
+                    <div class="text-right">
+                        <span class="font-bold text-sm px-2 py-1 rounded-full ${
+                            signal.confidence >= 90 ? 'text-green-700 bg-green-200' : 
+                            signal.confidence >= 75 ? 'text-orange-700 bg-orange-200' : 'text-gray-700 bg-gray-200'
+                        }">${signal.confidence}%</span>
+                        <p class="text-xs text-gray-500 mt-1">Confidence</p>
+                    </div>
                 </div>
-                <p class="text-sm text-gray-600 mb-2">${signal.reasoning}</p>
-                <div class="flex items-center justify-between text-xs text-gray-500">
-                    <span>Target: ₹${signal.target_price} | SL: ₹${signal.stop_loss}</span>
-                    <span>Just now</span>
+                <div class="bg-white/70 rounded-xl p-3 mb-3">
+                    <p class="text-sm text-gray-700 font-medium">${signal.reasoning}</p>
+                </div>
+                <div class="flex items-center justify-between">
+                    <div class="flex space-x-4 text-sm">
+                        <span class="text-green-700 font-semibold">Target: ₹${signal.target_price}</span>
+                        <span class="text-red-700 font-semibold">SL: ₹${signal.stop_loss}</span>
+                    </div>
+                    <span class="text-xs text-gray-500 bg-white/50 px-2 py-1 rounded-full">Just now</span>
+                </div>
+                <div class="mt-2 text-xs text-gray-600 text-center">
+                    <span class="bg-white/60 px-2 py-1 rounded-full">PKRSOLUTION AI Signal</span>
                 </div>
             `;
             

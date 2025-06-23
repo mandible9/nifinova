@@ -59,7 +59,7 @@ class OptionsData:
 # In-memory storage
 class DataStore:
     def __init__(self):
-        self.users = [{"id": 1, "username": "admin", "password": "admin"}]
+        self.users = [{"id": 1, "username": "pkrsolution", "password": "prabhanjan2025"}]
         self.whatsapp_users: List[WhatsAppUser] = []
         self.trading_signals: List[TradingSignal] = []
         self.market_data: Dict[str, MarketData] = {}
@@ -173,9 +173,9 @@ class WhatsAppService:
         self.api_url = 'https://graph.facebook.com/v17.0'
 
     def send_trading_signal(self, phone_number: str, signal: TradingSignal):
-        message = f"""🚨 STRONG BUY SIGNAL 🚨
+        message = f"""🚨 PKRSOLUTION AI SIGNAL 🚨
 
-📈 {signal.type} Signal
+📈 {signal.type} Signal Alert
 🎯 Strike: {signal.strike_price}
 💪 Confidence: {signal.confidence}%
 
@@ -188,7 +188,8 @@ class WhatsAppService:
 
 ⚠️ Risk Disclaimer: Trading involves risk. Please trade responsibly.
 
-Powered by Nifty AI Trading Assistant"""
+🔥 Powered by PKRSOLUTION
+💼 By Prabhanjan Kumar Rawat © 2025"""
 
         if not self.access_token or not self.phone_number_id:
             print(f"WhatsApp message would be sent to {phone_number}: {message}")

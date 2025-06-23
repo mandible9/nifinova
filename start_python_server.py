@@ -16,10 +16,11 @@ if __name__ == "__main__":
     # Start AI signal generation
     ai_service.start_signal_generation()
     
-    print("Starting Nifty AI Trading Assistant...")
+    print("Starting PKRSOLUTION Nifty AI Trading Platform...")
+    print("Powered by Prabhanjan Kumar Rawat @2025")
     print("Real-time updates: Every 1 second")
     print("Access at: http://localhost:5000")
-    print("Login: admin/admin")
+    print("Login: pkrsolution/prabhanjan2025")
     print("Press Ctrl+C to stop")
     
     try:
