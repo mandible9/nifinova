@@ -16,8 +16,8 @@ if __name__ == "__main__":
     # Start AI signal generation
     ai_service.start_signal_generation()
     
-    print("Starting PKRSOLUTION Nifty AI Trading Platform...")
-    print("Powered by Prabhanjan Kumar Rawat @2025")
+    print("Starting NIFINOVA - Advanced AI Trading Platform...")
+    print("By PKR SOLUTION - Powered by Prabhanjan Kumar Rawat @2025")
     print("Real-time updates: Every 1 second")
     print("Access at: http://localhost:5000")
     print("Login: pkrsolution/prabhanjan2025")

@@ -7,12 +7,15 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center py-6">
                 <div class="flex items-center space-x-4">
-                    <div class="h-12 w-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                        <div class="text-white font-bold text-sm">PKR</div>
+                    <div class="h-14 w-14 bg-gradient-to-br from-blue-500 via-purple-600 to-indigo-700 rounded-2xl flex items-center justify-center shadow-2xl transform hover:scale-105 transition-transform duration-300">
+                        <div class="text-center">
+                            <div class="text-white font-bold text-base">N</div>
+                            <div class="text-white text-xs font-medium opacity-90 -mt-1">PKR</div>
+                        </div>
                     </div>
                     <div>
-                        <h1 class="text-2xl font-bold pkr-logo">PKRSOLUTION</h1>
-                        <p class="text-sm text-gray-600">AI Trading Platform by Prabhanjan Kumar Rawat</p>
+                        <h1 class="text-2xl font-bold pkr-logo">NIFINOVA</h1>
+                        <p class="text-sm text-gray-600">by PKR SOLUTION - Advanced AI Trading Platform</p>
                     </div>
                 </div>
                 <div class="flex items-center space-x-6">
@@ -23,7 +26,7 @@
                         </span>
                     </div>
                     <div class="text-sm text-gray-600">
-                        <span class="font-medium">© 2025 PKRSOLUTION</span>
+                        <span class="font-medium">© 2025 PKR SOLUTION</span>
                     </div>
                     <button onclick="logout()" class="text-gray-600 hover:text-gray-900 p-2 rounded-lg hover:bg-white/20 transition-colors">
                         <i data-lucide="log-out" class="h-5 w-5"></i>
@@ -95,15 +98,18 @@
                 <div class="p-6 border-b border-gray-200">
                     <h2 class="text-xl font-bold text-gray-900 flex items-center">
                         <i data-lucide="brain" class="h-6 w-6 mr-3 text-purple-600"></i>
-                        PKRSOLUTION AI Signals
+                        NIFINOVA AI Signals
                     </h2>
                     <p class="text-sm text-gray-600 mt-2">Real-time AI-powered trading signals updated every second</p>
                 </div>
                 <div class="p-6">
                     <div id="signals-container" class="space-y-4">
-                        <div class="text-center py-8 text-gray-500">
-                            <i data-lucide="clock" class="h-8 w-8 mx-auto mb-2"></i>
-                            <p>Waiting for signals...</p>
+                        <div class="text-center py-12 text-gray-500">
+                            <div class="mx-auto h-16 w-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center mb-4">
+                                <i data-lucide="brain" class="h-8 w-8 text-gray-400"></i>
+                            </div>
+                            <p class="text-lg font-medium">NIFINOVA AI Initializing...</p>
+                            <p class="text-sm text-gray-400 mt-1">Advanced signals will appear here</p>
                         </div>
                     </div>
                 </div>
@@ -116,13 +122,13 @@
                         <i data-lucide="message-circle" class="h-6 w-6 mr-3 text-green-600"></i>
                         WhatsApp Alerts
                     </h2>
-                    <p class="text-sm text-gray-600 mt-2">Manage users receiving PKRSOLUTION signal alerts</p>
+                    <p class="text-sm text-gray-600 mt-2">Manage users receiving NIFINOVA signal alerts</p>
                 </div>
                 <div class="p-6">
                     <form id="whatsapp-form" class="mb-4">
                         <div class="flex space-x-3">
                             <input id="phone-input" type="tel" placeholder="+91 9876543210" 
-                                   class="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200">
+                                   class="flex-1 px-4 py-3 form-input rounded-xl focus:outline-none transition-all duration-200">
                             <button type="submit" class="px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white font-semibold rounded-xl hover:from-green-600 hover:to-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200 shadow-lg">
                                 Add User
                             </button>
@@ -144,11 +150,11 @@
                     <i data-lucide="bar-chart-3" class="h-6 w-6 mr-3 text-orange-600"></i>
                     NIFTY 50 Options Chain
                 </h2>
-                <p class="text-sm text-gray-600 mt-2">Real-time options data powered by PKRSOLUTION</p>
+                <p class="text-sm text-gray-600 mt-2">Real-time options data powered by NIFINOVA</p>
             </div>
-            <div class="overflow-x-auto">
+            <div class="overflow-x-auto professional-table rounded-xl">
                 <table class="min-w-full">
-                    <thead class="bg-gray-50">
+                    <thead class="table-header">
                         <tr>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Call LTP</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Call Volume</th>

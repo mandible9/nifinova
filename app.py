@@ -173,7 +173,7 @@ class WhatsAppService:
         self.api_url = 'https://graph.facebook.com/v17.0'
 
     def send_trading_signal(self, phone_number: str, signal: TradingSignal):
-        message = f"""🚨 PKRSOLUTION AI SIGNAL 🚨
+        message = f"""🚨 NIFINOVA AI SIGNAL 🚨
 
 📈 {signal.type} Signal Alert
 🎯 Strike: {signal.strike_price}
@@ -188,8 +188,8 @@ class WhatsAppService:
 
 ⚠️ Risk Disclaimer: Trading involves risk. Please trade responsibly.
 
-🔥 Powered by PKRSOLUTION
-💼 By Prabhanjan Kumar Rawat © 2025"""
+🔥 Powered by NIFINOVA
+💼 PKR SOLUTION © 2025"""
 
         if not self.access_token or not self.phone_number_id:
             print(f"WhatsApp message would be sent to {phone_number}: {message}")
