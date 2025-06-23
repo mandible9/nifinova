@@ -15,7 +15,7 @@ echo.
 REM Set environment and start server
 set NODE_ENV=development
 echo Starting server in background...
-start /B tsx server/index.ts
+start /B npx tsx server/index.ts
 
 REM Wait for server to initialize
 echo Waiting for server to start...

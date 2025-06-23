@@ -9,7 +9,7 @@ echo Starting server...
 set NODE_ENV=development
 
 REM Start the server in background and open browser
-start "" tsx server/index.ts
+start "" npx tsx server/index.ts
 
 REM Wait a few seconds for server to start, then open browser
 timeout /t 5 /nobreak >nul

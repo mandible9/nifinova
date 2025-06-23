@@ -15,7 +15,7 @@ try {
     $serverJob = Start-Job -ScriptBlock {
         Set-Location $using:PWD
         $env:NODE_ENV = "development"
-        tsx server/index.ts
+        npx tsx server/index.ts
     }
     
     # Wait a few seconds for server to start
