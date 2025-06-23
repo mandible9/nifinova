@@ -26,7 +26,10 @@ set NODE_ENV=development
 
 REM Start server directly (not in background to see output)
 echo Server starting...
+echo Once you see "serving on port 5000", open: http://localhost:5000
 echo.
 npx tsx server/index.ts
 
+echo.
+echo Server stopped. Press any key to exit...
 pause
