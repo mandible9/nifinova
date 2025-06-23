@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Nifty AI Trading Assistant{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <style>
+        .pulse-green { animation: pulse-green 1s ease-in-out; }
+        .pulse-red { animation: pulse-red 1s ease-in-out; }
+        @keyframes pulse-green {
+            0%, 100% { background-color: transparent; }
+            50% { background-color: rgb(220, 252, 231); }
+        }
+        @keyframes pulse-red {
+            0%, 100% { background-color: transparent; }
+            50% { background-color: rgb(254, 226, 226); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    {% block content %}{% endblock %}
+    
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+        
+        // Socket.IO connection
+        const socket = io();
+        
+        socket.on('connect', function() {
+            console.log('Connected to real-time updates');
+        });
+        
+        socket.on('market_update', function(data) {
+            updateMarketData(data);
+        });
+        
+        function updateMarketData(data) {
+            // Update Nifty price
+            if (data.nifty_data) {
+                const priceElement = document.getElementById('nifty-price');
+                const changeElement = document.getElementById('nifty-change');
+                
+                if (priceElement) {
+                    priceElement.textContent = data.nifty_data.price.toFixed(2);
+                    priceElement.classList.add(data.nifty_data.change >= 0 ? 'pulse-green' : 'pulse-red');
+                    setTimeout(() => {
+                        priceElement.classList.remove('pulse-green', 'pulse-red');
+                    }, 1000);
+                }
+                
+                if (changeElement) {
+                    const change = data.nifty_data.change;
+                    const changePercent = data.nifty_data.change_percent;
+                    changeElement.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)} (${changePercent.toFixed(2)}%)`;
+                    changeElement.className = `text-sm font-medium ${change >= 0 ? 'text-green-600' : 'text-red-600'}`;
+                }
+            }
+            
+            // Update signals
+            if (data.new_signals && data.new_signals.length > 0) {
+                addNewSignals(data.new_signals);
+            }
+            
+            // Update options chain
+            if (data.options_chain) {
+                updateOptionsChain(data.options_chain);
+            }
+        }
+        
+        function addNewSignals(signals) {
+            const signalsContainer = document.getElementById('signals-container');
+            if (!signalsContainer) return;
+            
+            signals.forEach(signal => {
+                const signalElement = createSignalElement(signal);
+                signalsContainer.insertBefore(signalElement, signalsContainer.firstChild);
+                
+                // Remove old signals to keep only latest 5
+                const allSignals = signalsContainer.children;
+                if (allSignals.length > 5) {
+                    signalsContainer.removeChild(allSignals[allSignals.length - 1]);
+                }
+            });
+        }
+        
+        function createSignalElement(signal) {
+            const div = document.createElement('div');
+            div.className = `border-l-4 p-4 rounded-r-lg relative ${
+                signal.type === 'CALL' ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'
+            }`;
+            
+            div.innerHTML = `
+                <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center space-x-2">
+                        <span class="px-2 py-1 text-xs font-bold text-white rounded ${
+                            signal.type === 'CALL' ? 'bg-green-600' : 'bg-red-600'
+                        }">${signal.type}</span>
+                        <span class="font-medium">${signal.strike_price} ${signal.type === 'CALL' ? 'CE' : 'PE'}</span>
+                    </div>
+                    <span class="font-bold text-sm ${
+                        signal.confidence >= 90 ? 'text-green-600' : 
+                        signal.confidence >= 75 ? 'text-orange-600' : 'text-gray-600'
+                    }">${signal.confidence}% Confidence</span>
+                </div>
+                <p class="text-sm text-gray-600 mb-2">${signal.reasoning}</p>
+                <div class="flex items-center justify-between text-xs text-gray-500">
+                    <span>Target: ₹${signal.target_price} | SL: ₹${signal.stop_loss}</span>
+                    <span>Just now</span>
+                </div>
+            `;
+            
+            return div;
+        }
+        
+        function updateOptionsChain(optionsData) {
+            const tbody = document.getElementById('options-tbody');
+            if (!tbody) return;
+            
+            tbody.innerHTML = '';
+            optionsData.forEach(option => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50';
+                row.innerHTML = `
+                    <td class="px-4 py-3 text-green-600 font-medium">${option.call_ltp.toFixed(2)}</td>
+                    <td class="px-4 py-3 text-gray-600">${option.call_volume.toLocaleString()}</td>
+                    <td class="px-4 py-3 text-center font-bold bg-yellow-50">${option.strike_price}</td>
+                    <td class="px-4 py-3 text-right text-gray-600">${option.put_volume.toLocaleString()}</td>
+                    <td class="px-4 py-3 text-right text-red-600 font-medium">${option.put_ltp.toFixed(2)}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+    </script>
+</body>
+</html>

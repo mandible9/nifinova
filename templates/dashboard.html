@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center space-x-3">
+                    <div class="h-8 w-8 bg-indigo-600 rounded-lg flex items-center justify-center">
+                        <i data-lucide="trending-up" class="h-5 w-5 text-white"></i>
+                    </div>
+                    <h1 class="text-xl font-bold text-gray-900">Nifty AI Trading Assistant</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="text-sm text-gray-600">
+                        <span class="inline-flex items-center">
+                            <div class="h-2 w-2 bg-green-400 rounded-full mr-2 animate-pulse"></div>
+                            Live Data
+                        </span>
+                    </div>
+                    <button onclick="logout()" class="text-gray-600 hover:text-gray-900">
+                        <i data-lucide="log-out" class="h-5 w-5"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <!-- Market Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600">NIFTY 50</p>
+                        <p id="nifty-price" class="text-2xl font-bold text-gray-900">19,845.30</p>
+                        <p id="nifty-change" class="text-sm font-medium text-green-600">+45.20 (+0.23%)</p>
+                    </div>
+                    <div class="h-12 w-12 bg-blue-50 rounded-lg flex items-center justify-center">
+                        <i data-lucide="trending-up" class="h-6 w-6 text-blue-600"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600">Active Signals</p>
+                        <p id="active-signals" class="text-2xl font-bold text-gray-900">0</p>
+                        <p class="text-sm font-medium text-gray-500">Generated today</p>
+                    </div>
+                    <div class="h-12 w-12 bg-green-50 rounded-lg flex items-center justify-center">
+                        <i data-lucide="zap" class="h-6 w-6 text-green-600"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600">WhatsApp Users</p>
+                        <p id="whatsapp-count" class="text-2xl font-bold text-gray-900">0</p>
+                        <p class="text-sm font-medium text-gray-500">Receiving alerts</p>
+                    </div>
+                    <div class="h-12 w-12 bg-purple-50 rounded-lg flex items-center justify-center">
+                        <i data-lucide="users" class="h-6 w-6 text-purple-600"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600">Success Rate</p>
+                        <p class="text-2xl font-bold text-gray-900">74.5%</p>
+                        <p class="text-sm font-medium text-gray-500">Last 30 days</p>
+                    </div>
+                    <div class="h-12 w-12 bg-yellow-50 rounded-lg flex items-center justify-center">
+                        <i data-lucide="target" class="h-6 w-6 text-yellow-600"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- AI Signals -->
+            <div class="bg-white rounded-lg shadow">
+                <div class="p-6 border-b border-gray-200">
+                    <h2 class="text-lg font-semibold text-gray-900 flex items-center">
+                        <i data-lucide="brain" class="h-5 w-5 mr-2 text-indigo-600"></i>
+                        Live AI Signals
+                    </h2>
+                    <p class="text-sm text-gray-600 mt-1">Real-time trading signals updated every second</p>
+                </div>
+                <div class="p-6">
+                    <div id="signals-container" class="space-y-4">
+                        <div class="text-center py-8 text-gray-500">
+                            <i data-lucide="clock" class="h-8 w-8 mx-auto mb-2"></i>
+                            <p>Waiting for signals...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- WhatsApp Management -->
+            <div class="bg-white rounded-lg shadow">
+                <div class="p-6 border-b border-gray-200">
+                    <h2 class="text-lg font-semibold text-gray-900 flex items-center">
+                        <i data-lucide="message-circle" class="h-5 w-5 mr-2 text-green-600"></i>
+                        WhatsApp Notifications
+                    </h2>
+                    <p class="text-sm text-gray-600 mt-1">Manage users receiving signal alerts</p>
+                </div>
+                <div class="p-6">
+                    <form id="whatsapp-form" class="mb-4">
+                        <div class="flex space-x-2">
+                            <input id="phone-input" type="tel" placeholder="+91 9876543210" 
+                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                            <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500">
+                                Add
+                            </button>
+                        </div>
+                    </form>
+                    <div id="whatsapp-users" class="space-y-2">
+                        <div class="text-center py-4 text-gray-500">
+                            <p class="text-sm">No users added yet</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Options Chain -->
+        <div class="mt-8 bg-white rounded-lg shadow">
+            <div class="p-6 border-b border-gray-200">
+                <h2 class="text-lg font-semibold text-gray-900 flex items-center">
+                    <i data-lucide="bar-chart-3" class="h-5 w-5 mr-2 text-orange-600"></i>
+                    Options Chain - NIFTY 50
+                </h2>
+                <p class="text-sm text-gray-600 mt-1">Real-time options data</p>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Call LTP</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Call Volume</th>
+                            <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Strike</th>
+                            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Put Volume</th>
+                            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Put LTP</th>
+                        </tr>
+                    </thead>
+                    <tbody id="options-tbody" class="bg-white divide-y divide-gray-200">
+                        <tr>
+                            <td colspan="5" class="px-4 py-8 text-center text-gray-500">Loading options data...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Load initial data
+async function loadInitialData() {
+    try {
+        // Load market overview
+        const marketResponse = await fetch('/api/market/overview');
+        const marketData = await marketResponse.json();
+        
+        document.getElementById('nifty-price').textContent = marketData.nifty50.price.toFixed(2);
+        document.getElementById('nifty-change').textContent = 
+            `${marketData.nifty50.change >= 0 ? '+' : ''}${marketData.nifty50.change.toFixed(2)} (${marketData.nifty50.change_percent.toFixed(2)}%)`;
+        document.getElementById('nifty-change').className = 
+            `text-sm font-medium ${marketData.nifty50.change >= 0 ? 'text-green-600' : 'text-red-600'}`;
+        
+        document.getElementById('active-signals').textContent = marketData.active_signals;
+        document.getElementById('whatsapp-count').textContent = marketData.whatsapp_users;
+        
+        // Load signals
+        const signalsResponse = await fetch('/api/signals');
+        const signals = await signalsResponse.json();
+        displaySignals(signals);
+        
+        // Load WhatsApp users
+        const usersResponse = await fetch('/api/whatsapp/users');
+        const users = await usersResponse.json();
+        displayWhatsAppUsers(users);
+        
+        // Load options chain
+        const optionsResponse = await fetch('/api/options-chain');
+        const options = await optionsResponse.json();
+        updateOptionsChain(options);
+        
+    } catch (error) {
+        console.error('Error loading data:', error);
+    }
+}
+
+function displaySignals(signals) {
+    const container = document.getElementById('signals-container');
+    if (signals.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-8 text-gray-500">
+                <i data-lucide="clock" class="h-8 w-8 mx-auto mb-2"></i>
+                <p>Waiting for signals...</p>
+            </div>
+        `;
+        lucide.createIcons();
+        return;
+    }
+    
+    container.innerHTML = '';
+    signals.slice(0, 5).forEach(signal => {
+        container.appendChild(createSignalElement(signal));
+    });
+}
+
+function displayWhatsAppUsers(users) {
+    const container = document.getElementById('whatsapp-users');
+    if (users.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-4 text-gray-500">
+                <p class="text-sm">No users added yet</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = '';
+    users.forEach(user => {
+        const div = document.createElement('div');
+        div.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-lg';
+        div.innerHTML = `
+            <span class="text-sm font-medium">${user.phone_number}</span>
+            <button onclick="removeWhatsAppUser('${user.phone_number}')" 
+                    class="text-red-600 hover:text-red-800">
+                <i data-lucide="x" class="h-4 w-4"></i>
+            </button>
+        `;
+        container.appendChild(div);
+    });
+    lucide.createIcons();
+}
+
+// WhatsApp form handling
+document.getElementById('whatsapp-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const phoneInput = document.getElementById('phone-input');
+    const phoneNumber = phoneInput.value.trim();
+    
+    if (!phoneNumber) return;
+    
+    try {
+        const response = await fetch('/api/whatsapp/users', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ phone_number: phoneNumber })
+        });
+        
+        if (response.ok) {
+            phoneInput.value = '';
+            // Reload users
+            const usersResponse = await fetch('/api/whatsapp/users');
+            const users = await usersResponse.json();
+            displayWhatsAppUsers(users);
+        } else {
+            const error = await response.json();
+            alert('Error: ' + error.error);
+        }
+    } catch (error) {
+        alert('Error adding user: ' + error.message);
+    }
+});
+
+async function removeWhatsAppUser(phoneNumber) {
+    try {
+        const response = await fetch(`/api/whatsapp/users/${encodeURIComponent(phoneNumber)}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            // Reload users
+            const usersResponse = await fetch('/api/whatsapp/users');
+            const users = await usersResponse.json();
+            displayWhatsAppUsers(users);
+        }
+    } catch (error) {
+        alert('Error removing user: ' + error.message);
+    }
+}
+
+async function logout() {
+    try {
+        await fetch('/logout', { method: 'POST' });
+        window.location.href = '/login';
+    } catch (error) {
+        console.error('Logout error:', error);
+        window.location.href = '/login';
+    }
+}
+
+// Load data on page load
+document.addEventListener('DOMContentLoaded', loadInitialData);
+</script>
+{% endblock %}
