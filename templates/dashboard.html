@@ -1,323 +1,502 @@
+
 {% extends "base.html" %}
 
+{% block title %}Trading Dashboard{% endblock %}
+
 {% block content %}
-<div class="min-h-screen pkr-gradient">
+<div class="min-h-screen bg-gray-50">
     <!-- Header -->
-    <header class="pkr-card shadow-lg border-b border-white/20">
+    <header class="bg-white shadow-sm border-b">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center py-6">
-                <div class="flex items-center space-x-4">
-                    <div class="h-14 w-14 bg-gradient-to-br from-blue-500 via-purple-600 to-indigo-700 rounded-2xl flex items-center justify-center shadow-2xl transform hover:scale-105 transition-transform duration-300">
-                        <div class="text-center">
-                            <div class="text-white font-bold text-base">N</div>
-                            <div class="text-white text-xs font-medium opacity-90 -mt-1">PKR</div>
-                        </div>
-                    </div>
-                    <div>
-                        <h1 class="text-2xl font-bold pkr-logo">NIFINOVA</h1>
-                        <p class="text-sm text-gray-600">by PKR SOLUTION - Advanced AI Trading Platform</p>
-                    </div>
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center">
+                    <h1 class="text-2xl font-bold text-gray-900">NIFINOVA AI</h1>
+                    <span class="ml-3 px-3 py-1 text-sm font-medium rounded-full bg-blue-100 text-blue-800">Live Dashboard</span>
                 </div>
-                <div class="flex items-center space-x-6">
-                    <div class="text-sm text-gray-700">
-                        <span class="inline-flex items-center bg-green-100 px-3 py-1 rounded-full">
-                            <div class="h-2 w-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-                            <span class="font-medium">Live Data Active</span>
+                <div class="flex items-center space-x-4">
+                    <div id="marketStatus" class="px-3 py-1 rounded-full text-sm font-medium">
+                        <span class="flex items-center">
+                            <span class="w-2 h-2 rounded-full mr-2" id="statusDot"></span>
+                            <span id="statusText">Loading...</span>
                         </span>
                     </div>
-                    <div class="text-sm text-gray-600">
-                        <span class="font-medium">© 2025 PKR SOLUTION</span>
-                    </div>
-                    <button onclick="logout()" class="text-gray-600 hover:text-gray-900 p-2 rounded-lg hover:bg-white/20 transition-colors">
-                        <i data-lucide="log-out" class="h-5 w-5"></i>
-                    </button>
+                    <span class="text-gray-600">Welcome, {{ session.username }}</span>
+                    <button onclick="logout()" class="text-red-600 hover:text-red-800">Logout</button>
                 </div>
             </div>
         </div>
     </header>
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <!-- Market Overview -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div class="stats-card rounded-2xl shadow-xl p-6">
+    <!-- Flash Message Banner -->
+    <div id="flashBanner" class="hidden">
+        <div class="bg-gradient-to-r from-yellow-400 to-orange-500 text-white py-3 px-4">
+            <div class="max-w-7xl mx-auto flex items-center justify-center">
+                <span class="text-lg font-bold" id="flashMessage">Loading...</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Market Overview Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
                 <div class="flex items-center justify-between">
                     <div>
-                        <p class="text-sm font-semibold text-gray-700 uppercase tracking-wide">NIFTY 50</p>
-                        <p id="nifty-price" class="text-3xl font-bold text-gray-900 mt-2">19,845.30</p>
-                        <p id="nifty-change" class="text-sm font-medium text-green-600 mt-1">+45.20 (+0.23%)</p>
+                        <p class="text-sm font-medium text-gray-600">Nifty 50</p>
+                        <p class="text-2xl font-bold text-gray-900" id="niftyPrice">₹0.00</p>
+                        <p class="text-sm" id="niftyChange">+0.00 (0.00%)</p>
                     </div>
-                    <div class="h-14 w-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
-                        <i data-lucide="trending-up" class="h-7 w-7 text-white"></i>
+                    <div class="text-right">
+                        <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                            </svg>
+                        </div>
+                        <div class="mt-2">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" id="sentimentBadge">
+                                NEUTRAL
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <p class="text-xs text-gray-500">Volume: <span id="niftyVolume">0</span></p>
+                    <p class="text-xs text-gray-500">Last Updated: <span id="lastUpdated">--</span></p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-600">Active Signals</p>
+                        <p class="text-2xl font-bold text-gray-900" id="activeSignals">0</p>
+                    </div>
+                    <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
                     </div>
                 </div>
             </div>
-            
-            <div class="stats-card rounded-2xl shadow-xl p-6">
+
+            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
                 <div class="flex items-center justify-between">
                     <div>
-                        <p class="text-sm font-semibold text-gray-700 uppercase tracking-wide">AI Signals</p>
-                        <p id="active-signals" class="text-3xl font-bold text-gray-900 mt-2">0</p>
-                        <p class="text-sm font-medium text-gray-600 mt-1">Generated today</p>
+                        <p class="text-sm font-medium text-gray-600">Success Rate</p>
+                        <p class="text-2xl font-bold text-gray-900" id="successRate">0%</p>
                     </div>
-                    <div class="h-14 w-14 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg">
-                        <i data-lucide="zap" class="h-7 w-7 text-white"></i>
+                    <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
                     </div>
                 </div>
             </div>
-            
-            <div class="stats-card rounded-2xl shadow-xl p-6">
+
+            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
                 <div class="flex items-center justify-between">
                     <div>
-                        <p class="text-sm font-semibold text-gray-700 uppercase tracking-wide">WhatsApp Users</p>
-                        <p id="whatsapp-count" class="text-3xl font-bold text-gray-900 mt-2">0</p>
-                        <p class="text-sm font-medium text-gray-600 mt-1">Receiving alerts</p>
+                        <p class="text-sm font-medium text-gray-600">WhatsApp Users</p>
+                        <p class="text-2xl font-bold text-gray-900" id="whatsappUsers">0</p>
                     </div>
-                    <div class="h-14 w-14 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
-                        <i data-lucide="users" class="h-7 w-7 text-white"></i>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="stats-card rounded-2xl shadow-xl p-6">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Success Rate</p>
-                        <p class="text-3xl font-bold text-gray-900 mt-2">74.5%</p>
-                        <p class="text-sm font-medium text-gray-600 mt-1">Last 30 days</p>
-                    </div>
-                    <div class="h-14 w-14 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-2xl flex items-center justify-center shadow-lg">
-                        <i data-lucide="target" class="h-7 w-7 text-white"></i>
+                    <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a2 2 0 01-2-2v-6a2 2 0 012-2h8z"></path>
+                        </svg>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <!-- AI Signals -->
-            <div class="pkr-card rounded-2xl shadow-2xl">
-                <div class="p-6 border-b border-gray-200">
-                    <h2 class="text-xl font-bold text-gray-900 flex items-center">
-                        <i data-lucide="brain" class="h-6 w-6 mr-3 text-purple-600"></i>
-                        NIFINOVA AI Signals
-                    </h2>
-                    <p class="text-sm text-gray-600 mt-2">Real-time AI-powered trading signals updated every second</p>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Trading Signals -->
+            <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-semibold text-gray-900">Latest AI Signals</h3>
+                    <p class="text-sm text-gray-600">Real-time trading signals powered by AI</p>
                 </div>
                 <div class="p-6">
-                    <div id="signals-container" class="space-y-4">
-                        <div class="text-center py-12 text-gray-500">
-                            <div class="mx-auto h-16 w-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center mb-4">
-                                <i data-lucide="brain" class="h-8 w-8 text-gray-400"></i>
-                            </div>
-                            <p class="text-lg font-medium">NIFINOVA AI Initializing...</p>
-                            <p class="text-sm text-gray-400 mt-1">Advanced signals will appear here</p>
+                    <div id="signalsContainer" class="space-y-4">
+                        <div class="text-center py-8 text-gray-500">
+                            Loading signals...
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- WhatsApp Management -->
-            <div class="pkr-card rounded-2xl shadow-2xl">
-                <div class="p-6 border-b border-gray-200">
-                    <h2 class="text-xl font-bold text-gray-900 flex items-center">
-                        <i data-lucide="message-circle" class="h-6 w-6 mr-3 text-green-600"></i>
-                        WhatsApp Alerts
-                    </h2>
-                    <p class="text-sm text-gray-600 mt-2">Manage users receiving NIFINOVA signal alerts</p>
+            <!-- Options Chain -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-semibold text-gray-900">Options Chain</h3>
+                    <p class="text-sm text-gray-600">Live Nifty 50 options data</p>
                 </div>
                 <div class="p-6">
-                    <form id="whatsapp-form" class="mb-4">
-                        <div class="flex space-x-3">
-                            <input id="phone-input" type="tel" placeholder="+91 9876543210" 
-                                   class="flex-1 px-4 py-3 form-input rounded-xl focus:outline-none transition-all duration-200">
-                            <button type="submit" class="px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white font-semibold rounded-xl hover:from-green-600 hover:to-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-200 shadow-lg">
-                                Add User
-                            </button>
-                        </div>
-                    </form>
-                    <div id="whatsapp-users" class="space-y-2">
-                        <div class="text-center py-4 text-gray-500">
-                            <p class="text-sm">No users added yet</p>
+                    <div id="optionsContainer" class="space-y-3">
+                        <div class="text-center py-8 text-gray-500">
+                            Loading options...
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Options Chain -->
-        <div class="mt-8 pkr-card rounded-2xl shadow-2xl">
-            <div class="p-6 border-b border-gray-200">
-                <h2 class="text-xl font-bold text-gray-900 flex items-center">
-                    <i data-lucide="bar-chart-3" class="h-6 w-6 mr-3 text-orange-600"></i>
-                    NIFTY 50 Options Chain
-                </h2>
-                <p class="text-sm text-gray-600 mt-2">Real-time options data powered by NIFINOVA</p>
+        <!-- WhatsApp Management -->
+        <div class="mt-8 bg-white rounded-xl shadow-sm border border-gray-200">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-900">WhatsApp Notifications</h3>
+                <p class="text-sm text-gray-600">Manage users receiving trading alerts</p>
             </div>
-            <div class="overflow-x-auto professional-table rounded-xl">
-                <table class="min-w-full">
-                    <thead class="table-header">
-                        <tr>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Call LTP</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Call Volume</th>
-                            <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Strike</th>
-                            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Put Volume</th>
-                            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Put LTP</th>
-                        </tr>
-                    </thead>
-                    <tbody id="options-tbody" class="bg-white divide-y divide-gray-200">
-                        <tr>
-                            <td colspan="5" class="px-4 py-8 text-center text-gray-500">Loading options data...</td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div class="p-6">
+                <div class="flex space-x-4 mb-6">
+                    <input type="tel" id="phoneInput" placeholder="+91XXXXXXXXXX" 
+                           class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <button onclick="addWhatsAppUser()" 
+                            class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:ring-2 focus:ring-green-500">
+                        Add User
+                    </button>
+                </div>
+                <div id="whatsappUsersContainer" class="space-y-2">
+                    <div class="text-center py-4 text-gray-500">
+                        Loading WhatsApp users...
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
+<script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
 <script>
-// Load initial data
-async function loadInitialData() {
-    try {
-        // Load market overview
-        const marketResponse = await fetch('/api/market/overview');
-        const marketData = await marketResponse.json();
-        
-        document.getElementById('nifty-price').textContent = marketData.nifty50.price.toFixed(2);
-        document.getElementById('nifty-change').textContent = 
-            `${marketData.nifty50.change >= 0 ? '+' : ''}${marketData.nifty50.change.toFixed(2)} (${marketData.nifty50.change_percent.toFixed(2)}%)`;
-        document.getElementById('nifty-change').className = 
-            `text-sm font-medium ${marketData.nifty50.change >= 0 ? 'text-green-600' : 'text-red-600'}`;
-        
-        document.getElementById('active-signals').textContent = marketData.active_signals;
-        document.getElementById('whatsapp-count').textContent = marketData.whatsapp_users;
-        
-        // Load signals
-        const signalsResponse = await fetch('/api/signals');
-        const signals = await signalsResponse.json();
-        displaySignals(signals);
-        
-        // Load WhatsApp users
-        const usersResponse = await fetch('/api/whatsapp/users');
-        const users = await usersResponse.json();
-        displayWhatsAppUsers(users);
-        
-        // Load options chain
-        const optionsResponse = await fetch('/api/options-chain');
-        const options = await optionsResponse.json();
-        updateOptionsChain(options);
-        
-    } catch (error) {
-        console.error('Error loading data:', error);
-    }
-}
+    const socket = io();
+    let isConnected = false;
 
-function displaySignals(signals) {
-    const container = document.getElementById('signals-container');
-    if (signals.length === 0) {
-        container.innerHTML = `
-            <div class="text-center py-8 text-gray-500">
-                <i data-lucide="clock" class="h-8 w-8 mx-auto mb-2"></i>
-                <p>Waiting for signals...</p>
-            </div>
-        `;
-        lucide.createIcons();
-        return;
-    }
-    
-    container.innerHTML = '';
-    signals.slice(0, 5).forEach(signal => {
-        container.appendChild(createSignalElement(signal));
+    // Socket connection
+    socket.on('connect', function() {
+        console.log('Connected to real-time updates');
+        isConnected = true;
+        updateConnectionStatus(true);
     });
-}
 
-function displayWhatsAppUsers(users) {
-    const container = document.getElementById('whatsapp-users');
-    if (users.length === 0) {
-        container.innerHTML = `
-            <div class="text-center py-4 text-gray-500">
-                <p class="text-sm">No users added yet</p>
-            </div>
-        `;
-        return;
-    }
-    
-    container.innerHTML = '';
-    users.forEach(user => {
-        const div = document.createElement('div');
-        div.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-lg';
-        div.innerHTML = `
-            <span class="text-sm font-medium">${user.phone_number}</span>
-            <button onclick="removeWhatsAppUser('${user.phone_number}')" 
-                    class="text-red-600 hover:text-red-800">
-                <i data-lucide="x" class="h-4 w-4"></i>
-            </button>
-        `;
-        container.appendChild(div);
+    socket.on('disconnect', function() {
+        console.log('Disconnected from server');
+        isConnected = false;
+        updateConnectionStatus(false);
     });
-    lucide.createIcons();
-}
 
-// WhatsApp form handling
-document.getElementById('whatsapp-form').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    
-    const phoneInput = document.getElementById('phone-input');
-    const phoneNumber = phoneInput.value.trim();
-    
-    if (!phoneNumber) return;
-    
-    try {
-        const response = await fetch('/api/whatsapp/users', {
+    socket.on('market_update', function(data) {
+        console.log('Market update received:', data);
+        updateNiftyData(data.nifty_data);
+        updateSignals(data.new_signals);
+        updateOptionsChain(data.options_chain);
+    });
+
+    function updateConnectionStatus(connected) {
+        const statusDot = document.getElementById('statusDot');
+        if (connected) {
+            statusDot.className = 'w-2 h-2 rounded-full mr-2 bg-green-500';
+        } else {
+            statusDot.className = 'w-2 h-2 rounded-full mr-2 bg-red-500';
+        }
+    }
+
+    function updateMarketStatus(status) {
+        const statusElement = document.getElementById('marketStatus');
+        const statusText = document.getElementById('statusText');
+        const statusDot = document.getElementById('statusDot');
+        
+        let bgClass = 'bg-gray-100 text-gray-800';
+        let dotClass = 'w-2 h-2 rounded-full mr-2 bg-gray-500';
+        
+        switch(status) {
+            case 'OPEN':
+                bgClass = 'bg-green-100 text-green-800';
+                dotClass = 'w-2 h-2 rounded-full mr-2 bg-green-500';
+                statusText.textContent = 'Market Open';
+                break;
+            case 'CLOSED':
+                bgClass = 'bg-red-100 text-red-800';
+                dotClass = 'w-2 h-2 rounded-full mr-2 bg-red-500';
+                statusText.textContent = 'Market Closed';
+                break;
+            case 'PRE_MARKET':
+                bgClass = 'bg-yellow-100 text-yellow-800';
+                dotClass = 'w-2 h-2 rounded-full mr-2 bg-yellow-500';
+                statusText.textContent = 'Pre-Market';
+                break;
+            case 'WEEKEND':
+                bgClass = 'bg-blue-100 text-blue-800';
+                dotClass = 'w-2 h-2 rounded-full mr-2 bg-blue-500';
+                statusText.textContent = 'Weekend';
+                break;
+        }
+        
+        statusElement.className = `px-3 py-1 rounded-full text-sm font-medium ${bgClass}`;
+        statusDot.className = dotClass;
+    }
+
+    function updateNiftyData(data) {
+        document.getElementById('niftyPrice').textContent = `₹${data.price.toFixed(2)}`;
+        
+        const changeElement = document.getElementById('niftyChange');
+        const changeColor = data.change >= 0 ? 'text-green-600' : 'text-red-600';
+        const changeSign = data.change >= 0 ? '+' : '';
+        changeElement.textContent = `${changeSign}${data.change.toFixed(2)} (${changeSign}${data.change_percent.toFixed(2)}%)`;
+        changeElement.className = `text-sm ${changeColor}`;
+        
+        document.getElementById('niftyVolume').textContent = data.volume.toLocaleString();
+        document.getElementById('lastUpdated').textContent = new Date(data.last_updated).toLocaleTimeString();
+        
+        // Update market status
+        updateMarketStatus(data.market_status);
+        
+        // Update sentiment
+        updateSentiment(data.sentiment);
+        
+        // Update flash message
+        updateFlashMessage(data.flash_message);
+    }
+
+    function updateSentiment(sentiment) {
+        const sentimentBadge = document.getElementById('sentimentBadge');
+        let badgeClass = 'bg-gray-100 text-gray-800';
+        
+        switch(sentiment) {
+            case 'BULLISH':
+                badgeClass = 'bg-green-100 text-green-800';
+                break;
+            case 'BEARISH':
+                badgeClass = 'bg-red-100 text-red-800';
+                break;
+            case 'NEUTRAL':
+                badgeClass = 'bg-gray-100 text-gray-800';
+                break;
+        }
+        
+        sentimentBadge.className = `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeClass}`;
+        sentimentBadge.textContent = sentiment;
+    }
+
+    function updateFlashMessage(message) {
+        const flashBanner = document.getElementById('flashBanner');
+        const flashMessage = document.getElementById('flashMessage');
+        
+        if (message && message.trim() !== '') {
+            flashMessage.textContent = message;
+            flashBanner.classList.remove('hidden');
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                flashBanner.classList.add('hidden');
+            }, 5000);
+        }
+    }
+
+    function updateSignals(newSignals) {
+        if (newSignals && newSignals.length > 0) {
+            loadSignals();
+        }
+    }
+
+    function updateOptionsChain(optionsData) {
+        const container = document.getElementById('optionsContainer');
+        if (!optionsData || optionsData.length === 0) {
+            container.innerHTML = '<div class="text-center py-4 text-gray-500">No options data available</div>';
+            return;
+        }
+
+        const html = optionsData.slice(0, 5).map(option => `
+            <div class="border border-gray-200 rounded-lg p-3">
+                <div class="text-sm font-medium text-gray-900">₹${option.strike_price}</div>
+                <div class="grid grid-cols-2 gap-2 mt-2 text-xs">
+                    <div>
+                        <div class="text-gray-600">Call: ₹${option.call_ltp.toFixed(2)}</div>
+                        <div class="text-gray-500">Vol: ${option.call_volume.toLocaleString()}</div>
+                    </div>
+                    <div>
+                        <div class="text-gray-600">Put: ₹${option.put_ltp.toFixed(2)}</div>
+                        <div class="text-gray-500">Vol: ${option.put_volume.toLocaleString()}</div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        
+        container.innerHTML = html;
+    }
+
+    function loadMarketOverview() {
+        fetch('/api/market/overview')
+            .then(response => response.json())
+            .then(data => {
+                updateNiftyData(data.nifty50);
+                document.getElementById('activeSignals').textContent = data.active_signals;
+                document.getElementById('successRate').textContent = `${data.success_rate}%`;
+                document.getElementById('whatsappUsers').textContent = data.whatsapp_users;
+            })
+            .catch(error => {
+                console.error('Error loading data:', error);
+            });
+    }
+
+    function loadSignals() {
+        fetch('/api/signals')
+            .then(response => response.json())
+            .then(signals => {
+                const container = document.getElementById('signalsContainer');
+                
+                if (signals.length === 0) {
+                    container.innerHTML = '<div class="text-center py-8 text-gray-500">No signals available</div>';
+                    return;
+                }
+
+                const html = signals.slice(0, 10).map(signal => `
+                    <div class="border border-gray-200 rounded-lg p-4">
+                        <div class="flex justify-between items-start mb-3">
+                            <div class="flex items-center space-x-3">
+                                <span class="px-2 py-1 text-xs font-medium rounded ${signal.type === 'CALL' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                    ${signal.type}
+                                </span>
+                                <span class="text-lg font-semibold">₹${signal.strike_price}</span>
+                            </div>
+                            <span class="px-2 py-1 text-xs font-medium rounded-full ${signal.confidence >= 80 ? 'bg-green-100 text-green-800' : signal.confidence >= 60 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}">
+                                ${signal.confidence}%
+                            </span>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4 mb-3 text-sm">
+                            <div>
+                                <span class="text-gray-600">Target:</span>
+                                <span class="font-medium text-green-600">₹${signal.target_price}</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-600">Stop Loss:</span>
+                                <span class="font-medium text-red-600">₹${signal.stop_loss}</span>
+                            </div>
+                        </div>
+                        
+                        <p class="text-sm text-gray-600 mb-2">${signal.reasoning}</p>
+                        <div class="flex justify-between items-center text-xs text-gray-500">
+                            <span>Expiry: ${signal.expiry_date}</span>
+                            <span>${new Date(signal.created_at).toLocaleTimeString()}</span>
+                        </div>
+                    </div>
+                `).join('');
+                
+                container.innerHTML = html;
+            })
+            .catch(error => {
+                console.error('Error loading signals:', error);
+                document.getElementById('signalsContainer').innerHTML = '<div class="text-center py-8 text-red-500">Error loading signals</div>';
+            });
+    }
+
+    function loadOptionsChain() {
+        fetch('/api/options-chain')
+            .then(response => response.json())
+            .then(options => {
+                updateOptionsChain(options);
+            })
+            .catch(error => {
+                console.error('Error loading options chain:', error);
+            });
+    }
+
+    function loadWhatsAppUsers() {
+        fetch('/api/whatsapp/users')
+            .then(response => response.json())
+            .then(users => {
+                const container = document.getElementById('whatsappUsersContainer');
+                
+                if (users.length === 0) {
+                    container.innerHTML = '<div class="text-center py-4 text-gray-500">No WhatsApp users registered</div>';
+                    return;
+                }
+
+                const html = users.map(user => `
+                    <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                        <span class="text-sm font-medium">${user.phone_number}</span>
+                        <button onclick="removeWhatsAppUser('${user.phone_number}')" 
+                                class="text-red-600 hover:text-red-800 text-sm">Remove</button>
+                    </div>
+                `).join('');
+                
+                container.innerHTML = html;
+            })
+            .catch(error => {
+                console.error('Error loading WhatsApp users:', error);
+            });
+    }
+
+    function addWhatsAppUser() {
+        const phoneInput = document.getElementById('phoneInput');
+        const phoneNumber = phoneInput.value.trim();
+        
+        if (!phoneNumber) {
+            alert('Please enter a phone number');
+            return;
+        }
+
+        fetch('/api/whatsapp/users', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ phone_number: phoneNumber })
+            body: JSON.stringify({phone_number: phoneNumber})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+            } else {
+                phoneInput.value = '';
+                loadWhatsAppUsers();
+                loadMarketOverview();
+            }
+        })
+        .catch(error => {
+            console.error('Error adding user:', error);
+            alert('Error adding user');
         });
-        
-        if (response.ok) {
-            phoneInput.value = '';
-            // Reload users
-            const usersResponse = await fetch('/api/whatsapp/users');
-            const users = await usersResponse.json();
-            displayWhatsAppUsers(users);
-        } else {
-            const error = await response.json();
-            alert('Error: ' + error.error);
-        }
-    } catch (error) {
-        alert('Error adding user: ' + error.message);
     }
-});
 
-async function removeWhatsAppUser(phoneNumber) {
-    try {
-        const response = await fetch(`/api/whatsapp/users/${encodeURIComponent(phoneNumber)}`, {
+    function removeWhatsAppUser(phoneNumber) {
+        if (!confirm('Remove this user from WhatsApp notifications?')) {
+            return;
+        }
+
+        fetch(`/api/whatsapp/users/${encodeURIComponent(phoneNumber)}`, {
             method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                loadWhatsAppUsers();
+                loadMarketOverview();
+            } else {
+                alert('Error removing user');
+            }
+        })
+        .catch(error => {
+            console.error('Error removing user:', error);
+            alert('Error removing user');
         });
-        
-        if (response.ok) {
-            // Reload users
-            const usersResponse = await fetch('/api/whatsapp/users');
-            const users = await usersResponse.json();
-            displayWhatsAppUsers(users);
-        }
-    } catch (error) {
-        alert('Error removing user: ' + error.message);
     }
-}
 
-async function logout() {
-    try {
-        await fetch('/logout', { method: 'POST' });
-        window.location.href = '/login';
-    } catch (error) {
-        console.error('Logout error:', error);
-        window.location.href = '/login';
+    function logout() {
+        fetch('/logout', {method: 'POST'})
+            .then(() => {
+                window.location.href = '/login';
+            });
     }
-}
 
-// Load data on page load
-document.addEventListener('DOMContentLoaded', loadInitialData);
+    // Initial load
+    loadMarketOverview();
+    loadSignals();
+    loadOptionsChain();
+    loadWhatsAppUsers();
+
+    // Refresh data periodically
+    setInterval(loadMarketOverview, 30000); // Every 30 seconds
+    setInterval(loadSignals, 60000);        // Every minute
+    setInterval(loadWhatsAppUsers, 300000); // Every 5 minutes
 </script>
 {% endblock %}
