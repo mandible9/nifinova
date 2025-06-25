@@ -140,28 +140,27 @@ class NSEDataService:
     def __init__(self):
         self.base_url = "https://www.nseindia.com/api"
         self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'application/json, text/plain, */*',
             'Accept-Language': 'en-US,en;q=0.9',
             'Accept-Encoding': 'gzip, deflate, br',
             'Connection': 'keep-alive',
-            'Cache-Control': 'no-cache'
+            'Cache-Control': 'no-cache',
+            'Referer': 'https://www.nseindia.com/',
+            'Origin': 'https://www.nseindia.com'
         }
+        self.session = requests.Session()
+        self.session.headers.update(self.headers)
 
     def get_nifty_data(self) -> Dict:
         """Fetch real Nifty 50 data from NSE"""
+        market_status = market_status_service.get_market_status()
+        
+        # Always try to fetch real data first
         try:
-            # Get market status first
-            market_status = market_status_service.get_market_status()
-            
-            if market_status != "OPEN":
-                # Return last stored data if market is closed
-                if store.last_market_data:
-                    return store.last_market_data
-            
-            # Try to fetch live data
+            # Primary NSE API endpoint
             url = f"{self.base_url}/equity-stockIndices?index=NIFTY%2050"
-            response = requests.get(url, headers=self.headers, timeout=10)
+            response = self.session.get(url, timeout=10)
             
             if response.status_code == 200:
                 data = response.json()
@@ -175,19 +174,85 @@ class NSEDataService:
                     "market_status": market_status
                 }
                 
-                # Store the data for when market is closed
+                # Always store the latest data
                 store.last_market_data = result
+                print(f"Fetched real NSE data: {result['last_price']}")
                 return result
                 
         except Exception as e:
-            print(f"NSE API error: {e}")
+            print(f"Primary NSE API error: {e}")
         
-        # Return last stored data or fallback
+        # Try alternative NSE endpoint
+        try:
+            # Alternative endpoint for market data
+            url = "https://www.nseindia.com/api/marketStatus"
+            response = self.session.get(url, timeout=10)
+            
+            if response.status_code == 200:
+                # Try to get index data from market status
+                url2 = "https://www.nseindia.com/api/allIndices"
+                response2 = self.session.get(url2, timeout=10)
+                
+                if response2.status_code == 200:
+                    data = response2.json()
+                    nifty_data = next((item for item in data.get('data', []) if item.get('index') == 'NIFTY 50'), None)
+                    
+                    if nifty_data:
+                        result = {
+                            "last_price": float(nifty_data.get('last', 0)),
+                            "change": float(nifty_data.get('change', 0)),
+                            "net_change": float(nifty_data.get('percentChange', 0)),
+                            "volume": int(nifty_data.get('totalTradedVolume', 0)),
+                            "market_status": market_status
+                        }
+                        
+                        store.last_market_data = result
+                        print(f"Fetched real NSE data (alternative): {result['last_price']}")
+                        return result
+                        
+        except Exception as e:
+            print(f"Alternative NSE API error: {e}")
+        
+        # Try using Yahoo Finance as backup
+        try:
+            url = "https://query1.finance.yahoo.com/v8/finance/chart/%5ENSEI"
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+            response = requests.get(url, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                result_data = data['chart']['result'][0]
+                current_price = result_data['meta']['regularMarketPrice']
+                previous_close = result_data['meta']['previousClose']
+                
+                change = current_price - previous_close
+                change_percent = (change / previous_close) * 100
+                
+                result = {
+                    "last_price": float(current_price),
+                    "change": float(change),
+                    "net_change": float(change_percent),
+                    "volume": int(result_data['meta'].get('regularMarketVolume', 0)),
+                    "market_status": market_status
+                }
+                
+                store.last_market_data = result
+                print(f"Fetched real data from Yahoo Finance: {result['last_price']}")
+                return result
+                
+        except Exception as e:
+            print(f"Yahoo Finance API error: {e}")
+        
+        # Return last stored real data with updated market status
         if store.last_market_data:
             store.last_market_data["market_status"] = market_status
+            print(f"Using stored real data: {store.last_market_data['last_price']}")
             return store.last_market_data
         
-        # Final fallback with realistic data
+        # Only use fallback if no real data was ever fetched
+        print("Using fallback data - no real data available")
         return {
             "last_price": 19845.30,
             "change": 0,
