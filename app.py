@@ -9,6 +9,8 @@ from typing import List, Dict, Optional
 import random
 import math
 import pytz
+import re
+from urllib.parse import urljoin
 
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 from flask_socketio import SocketIO, emit
@@ -61,6 +63,19 @@ class OptionsData:
     put_volume: int
     expiry_date: str
 
+@dataclass
+class NewsFlash:
+    id: int
+    headline: str
+    summary: str
+    sentiment: str  # POSITIVE, NEGATIVE, NEUTRAL
+    impact: str     # HIGH, MEDIUM, LOW
+    category: str   # WAR, ECONOMY, POLITICS, CORPORATE, GLOBAL
+    source: str
+    url: str
+    timestamp: str
+    market_reaction: str  # Expected market reaction
+
 # In-memory storage
 class DataStore:
     def __init__(self):
@@ -69,8 +84,10 @@ class DataStore:
         self.trading_signals: List[TradingSignal] = []
         self.market_data: Dict[str, MarketData] = {}
         self.options_chain: List[OptionsData] = []
+        self.news_flashes: List[NewsFlash] = []
         self.next_signal_id = 1
         self.next_whatsapp_id = 1
+        self.next_news_id = 1
         self.last_market_data = None
 
     def add_whatsapp_user(self, phone_number: str) -> WhatsAppUser:
@@ -98,6 +115,16 @@ class DataStore:
 
     def get_active_signals(self) -> List[TradingSignal]:
         return [s for s in self.trading_signals if s.created_at >= (datetime.now() - timedelta(hours=24)).isoformat()]
+
+    def add_news_flash(self, news: NewsFlash) -> NewsFlash:
+        news.id = self.next_news_id
+        self.news_flashes.append(news)
+        self.next_news_id += 1
+        return news
+
+    def get_recent_news(self, hours: int = 6) -> List[NewsFlash]:
+        cutoff_time = datetime.now() - timedelta(hours=hours)
+        return [n for n in self.news_flashes if datetime.fromisoformat(n.timestamp) >= cutoff_time]
 
 store = DataStore()
 
@@ -330,6 +357,234 @@ class NSEDataService:
 
 nse_service = NSEDataService()
 
+# News Flash Service
+class NewsFlashService:
+    def __init__(self):
+        self.headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+        }
+        self.session = requests.Session()
+        self.session.headers.update(self.headers)
+        self.last_check = datetime.now()
+        self.processed_headlines = set()
+
+    def get_moneycontrol_news(self) -> List[Dict]:
+        """Fetch breaking news from MoneyControl"""
+        try:
+            # MoneyControl Breaking News API
+            url = "https://www.moneycontrol.com/news/business/"
+            response = self.session.get(url, timeout=10)
+            
+            if response.status_code == 200:
+                news_items = []
+                # Parse HTML content for news items
+                content = response.text
+                
+                # Extract news headlines and links using regex
+                headline_pattern = r'<a[^>]*href="([^"]*)"[^>]*class="[^"]*news-title[^"]*"[^>]*>([^<]+)</a>'
+                matches = re.findall(headline_pattern, content, re.IGNORECASE)
+                
+                for link, headline in matches[:10]:  # Top 10 headlines
+                    if headline.strip() and link not in self.processed_headlines:
+                        full_url = urljoin("https://www.moneycontrol.com", link)
+                        news_items.append({
+                            'headline': headline.strip(),
+                            'url': full_url,
+                            'source': 'MoneyControl'
+                        })
+                        self.processed_headlines.add(link)
+                
+                return news_items
+                
+        except Exception as e:
+            print(f"MoneyControl news fetch error: {e}")
+        
+        return []
+
+    def get_economic_times_news(self) -> List[Dict]:
+        """Fetch news from Economic Times"""
+        try:
+            url = "https://economictimes.indiatimes.com/markets/stocks/news"
+            response = self.session.get(url, timeout=10)
+            
+            if response.status_code == 200:
+                news_items = []
+                content = response.text
+                
+                # Extract headlines
+                headline_pattern = r'<a[^>]*href="([^"]*)"[^>]*>([^<]+)</a>'
+                matches = re.findall(headline_pattern, content)
+                
+                for link, headline in matches[:5]:
+                    if len(headline.strip()) > 20 and 'market' in headline.lower() or 'stock' in headline.lower():
+                        full_url = urljoin("https://economictimes.indiatimes.com", link)
+                        news_items.append({
+                            'headline': headline.strip(),
+                            'url': full_url,
+                            'source': 'Economic Times'
+                        })
+                
+                return news_items
+                
+        except Exception as e:
+            print(f"Economic Times news fetch error: {e}")
+        
+        return []
+
+    def get_reuters_india_news(self) -> List[Dict]:
+        """Fetch news from Reuters India"""
+        try:
+            url = "https://www.reuters.com/world/india/"
+            response = self.session.get(url, timeout=10)
+            
+            if response.status_code == 200:
+                news_items = []
+                content = response.text
+                
+                # Look for breaking news or important headlines
+                headline_pattern = r'<h3[^>]*>.*?<a[^>]*href="([^"]*)"[^>]*>([^<]+)</a>'
+                matches = re.findall(headline_pattern, content, re.DOTALL)
+                
+                for link, headline in matches[:3]:
+                    if len(headline.strip()) > 15:
+                        full_url = urljoin("https://www.reuters.com", link)
+                        news_items.append({
+                            'headline': headline.strip(),
+                            'url': full_url,
+                            'source': 'Reuters'
+                        })
+                
+                return news_items
+                
+        except Exception as e:
+            print(f"Reuters news fetch error: {e}")
+        
+        return []
+
+    def analyze_news_sentiment(self, headline: str) -> Dict:
+        """Analyze news sentiment and market impact"""
+        headline_lower = headline.lower()
+        
+        # High impact keywords
+        high_impact_positive = ['surge', 'soar', 'rally', 'boom', 'breakthrough', 'record high', 'all-time high']
+        high_impact_negative = ['crash', 'plunge', 'collapse', 'war', 'conflict', 'crisis', 'emergency', 'ban']
+        
+        # Medium impact keywords
+        medium_impact_positive = ['rise', 'gain', 'up', 'positive', 'growth', 'profit', 'deal', 'agreement']
+        medium_impact_negative = ['fall', 'drop', 'decline', 'down', 'loss', 'cut', 'concern', 'worry']
+        
+        # Category detection
+        category = 'GENERAL'
+        if any(word in headline_lower for word in ['war', 'military', 'conflict', 'attack', 'tension']):
+            category = 'WAR'
+        elif any(word in headline_lower for word in ['gdp', 'inflation', 'rate', 'rbi', 'policy', 'economy']):
+            category = 'ECONOMY'
+        elif any(word in headline_lower for word in ['election', 'minister', 'government', 'parliament']):
+            category = 'POLITICS'
+        elif any(word in headline_lower for word in ['company', 'earnings', 'ipo', 'merger', 'acquisition']):
+            category = 'CORPORATE'
+        elif any(word in headline_lower for word in ['global', 'international', 'world', 'china', 'usa', 'europe']):
+            category = 'GLOBAL'
+        
+        # Sentiment and impact analysis
+        sentiment = 'NEUTRAL'
+        impact = 'LOW'
+        market_reaction = 'Minimal impact expected'
+        
+        # Check for high impact words
+        if any(word in headline_lower for word in high_impact_positive):
+            sentiment = 'POSITIVE'
+            impact = 'HIGH'
+            market_reaction = 'Strong bullish sentiment expected'
+        elif any(word in headline_lower for word in high_impact_negative):
+            sentiment = 'NEGATIVE'
+            impact = 'HIGH'
+            market_reaction = 'Strong bearish sentiment expected'
+        elif any(word in headline_lower for word in medium_impact_positive):
+            sentiment = 'POSITIVE'
+            impact = 'MEDIUM'
+            market_reaction = 'Moderate positive impact'
+        elif any(word in headline_lower for word in medium_impact_negative):
+            sentiment = 'NEGATIVE'
+            impact = 'MEDIUM'
+            market_reaction = 'Moderate negative impact'
+        
+        # Special cases for war/conflict
+        if category == 'WAR':
+            sentiment = 'NEGATIVE'
+            impact = 'HIGH'
+            market_reaction = 'Flight to safety - markets may decline'
+        
+        return {
+            'sentiment': sentiment,
+            'impact': impact,
+            'category': category,
+            'market_reaction': market_reaction
+        }
+
+    def fetch_and_process_news(self) -> List[NewsFlash]:
+        """Fetch news from all sources and process them"""
+        all_news = []
+        
+        # Fetch from all sources
+        try:
+            moneycontrol_news = self.get_moneycontrol_news()
+            all_news.extend(moneycontrol_news)
+        except Exception as e:
+            print(f"MoneyControl fetch error: {e}")
+        
+        try:
+            et_news = self.get_economic_times_news()
+            all_news.extend(et_news)
+        except Exception as e:
+            print(f"ET fetch error: {e}")
+        
+        try:
+            reuters_news = self.get_reuters_india_news()
+            all_news.extend(reuters_news)
+        except Exception as e:
+            print(f"Reuters fetch error: {e}")
+        
+        # Process news items
+        processed_news = []
+        for news_item in all_news:
+            headline = news_item['headline']
+            
+            # Skip if headline too short or already processed
+            if len(headline) < 20 or headline in [n.headline for n in store.news_flashes[-10:]]:
+                continue
+            
+            # Analyze sentiment and impact
+            analysis = self.analyze_news_sentiment(headline)
+            
+            # Create summary (first 100 chars + "...")
+            summary = headline[:100] + "..." if len(headline) > 100 else headline
+            
+            # Create news flash object
+            news_flash = NewsFlash(
+                id=0,  # Will be set by store
+                headline=headline,
+                summary=summary,
+                sentiment=analysis['sentiment'],
+                impact=analysis['impact'],
+                category=analysis['category'],
+                source=news_item['source'],
+                url=news_item['url'],
+                timestamp=datetime.now().isoformat(),
+                market_reaction=analysis['market_reaction']
+            )
+            
+            processed_news.append(news_flash)
+        
+        return processed_news
+
+news_service = NewsFlashService()
+
 # Claude AI Service
 class ClaudeAIService:
     def __init__(self):
@@ -522,6 +777,37 @@ class WhatsAppService:
 ⏰ Updated: {datetime.now().strftime('%H:%M:%S')}
 
 🔥 NIFINOVA AI"""
+
+        return self._send_whatsapp_message(phone_number, message)
+
+    def send_news_flash(self, phone_number: str, news: NewsFlash):
+        """Send breaking news flash via WhatsApp"""
+        impact_emoji = "🚨" if news.impact == "HIGH" else "⚠️" if news.impact == "MEDIUM" else "ℹ️"
+        sentiment_emoji = "📈" if news.sentiment == "POSITIVE" else "📉" if news.sentiment == "NEGATIVE" else "📊"
+        
+        category_emoji = {
+            'WAR': '⚔️',
+            'ECONOMY': '💰',
+            'POLITICS': '🏛️',
+            'CORPORATE': '🏢',
+            'GLOBAL': '🌍',
+            'GENERAL': '📰'
+        }.get(news.category, '📰')
+        
+        message = f"""{impact_emoji} NEWS FLASH {impact_emoji}
+
+{category_emoji} {news.category} | {news.source}
+{sentiment_emoji} Impact: {news.impact}
+
+📰 {news.headline}
+
+💭 Market Reaction:
+{news.market_reaction}
+
+🔗 Source: {news.source}
+⏰ {datetime.now().strftime('%H:%M:%S')}
+
+🔥 NIFINOVA NEWS"""
 
         return self._send_whatsapp_message(phone_number, message)
 
@@ -927,6 +1213,29 @@ class AISignalsService:
             options_data = zerodha_service.get_options_chain()
             store.options_chain = options_data
             
+            # Check for breaking news (every 5 minutes)
+            current_time = datetime.now()
+            if (current_time - news_service.last_check).total_seconds() > 300:  # 5 minutes
+                breaking_news = news_service.fetch_and_process_news()
+                for news in breaking_news:
+                    if news.impact in ['HIGH', 'MEDIUM']:  # Only important news
+                        stored_news = store.add_news_flash(news)
+                        
+                        # Send WhatsApp alerts for high impact news
+                        if news.impact == 'HIGH':
+                            for user in store.whatsapp_users:
+                                if user.is_active:
+                                    whatsapp_service.send_news_flash(user.phone_number, news)
+                        
+                        # Emit news flash to dashboard
+                        socketio.emit('news_flash', {
+                            'news': asdict(stored_news)
+                        })
+                        
+                        print(f"NEWS FLASH: {news.headline[:50]}... | Impact: {news.impact} | Sentiment: {news.sentiment}")
+                
+                news_service.last_check = current_time
+            
             # Get AI sentiment analysis
             sentiment_analysis = claude_service.analyze_market_sentiment(nifty_data, options_data)
             
@@ -1114,7 +1423,7 @@ def remove_whatsapp_user(phone_number):
 
 @app.route('/api/options-chain')
 def options_chain():
-    options_data = zerodha_service.get_options_chain_data()
+    options_data = zerodha_service.get_options_chain()
     market_status = market_status_service.get_market_status()
     
     return jsonify({
@@ -1132,6 +1441,28 @@ def market_status():
         'status': status,
         'is_open': market_status_service.is_market_open(),
         'timestamp': datetime.now().isoformat()
+    })
+
+@app.route('/api/news/flash')
+def get_news_flash():
+    """Get recent news flashes"""
+    recent_news = store.get_recent_news(hours=6)
+    return jsonify([asdict(news) for news in recent_news])
+
+@app.route('/api/news/check')
+def check_news():
+    """Manually trigger news check"""
+    breaking_news = news_service.fetch_and_process_news()
+    new_flashes = []
+    
+    for news in breaking_news:
+        if news.impact in ['HIGH', 'MEDIUM']:
+            stored_news = store.add_news_flash(news)
+            new_flashes.append(stored_news)
+    
+    return jsonify({
+        'new_flashes': len(new_flashes),
+        'flashes': [asdict(news) for news in new_flashes]
     })
 
 # Socket.IO events
