@@ -1,4 +1,3 @@
-
 import os
 import json
 import time
@@ -154,15 +153,15 @@ class MarketStatusService:
     def is_market_open(self) -> bool:
         """Check if NSE market is currently open"""
         now = datetime.now(self.ist_tz)
-        
+
         # Check if it's a weekday (Monday=0, Sunday=6)
         if now.weekday() >= 5:  # Saturday or Sunday
             return False
-        
+
         # Market hours: 9:15 AM to 3:30 PM IST
         market_open = now.replace(hour=9, minute=15, second=0, microsecond=0)
         market_close = now.replace(hour=15, minute=30, second=0, microsecond=0)
-        
+
         return market_open <= now <= market_close
 
     def get_market_status(self) -> str:
@@ -200,17 +199,17 @@ class NSEDataService:
     def get_nifty_data(self) -> Dict:
         """Fetch real Nifty 50 data from NSE"""
         market_status = market_status_service.get_market_status()
-        
+
         # Always try to fetch real data first
         try:
             # Primary NSE API endpoint
             url = f"{self.base_url}/equity-stockIndices?index=NIFTY%2050"
             response = self.session.get(url, timeout=10)
-            
+
             if response.status_code == 200:
                 data = response.json()
                 nifty_data = data['data'][0]  # First item is usually Nifty 50
-                
+
                 result = {
                     "last_price": float(nifty_data.get('last', 0)),
                     "change": float(nifty_data.get('change', 0)),
@@ -218,30 +217,30 @@ class NSEDataService:
                     "volume": int(nifty_data.get('totalTradedVolume', 0)),
                     "market_status": market_status
                 }
-                
+
                 # Always store the latest data
                 store.last_market_data = result
                 print(f"Fetched real NSE data: {result['last_price']}")
                 return result
-                
+
         except Exception as e:
             print(f"Primary NSE API error: {e}")
-        
+
         # Try alternative NSE endpoint
         try:
             # Alternative endpoint for market data
             url = "https://www.nseindia.com/api/marketStatus"
             response = self.session.get(url, timeout=10)
-            
+
             if response.status_code == 200:
                 # Try to get index data from market status
                 url2 = "https://www.nseindia.com/api/allIndices"
                 response2 = self.session.get(url2, timeout=10)
-                
+
                 if response2.status_code == 200:
                     data = response2.json()
                     nifty_data = next((item for item in data.get('data', []) if item.get('index') == 'NIFTY 50'), None)
-                    
+
                     if nifty_data:
                         result = {
                             "last_price": float(nifty_data.get('last', 0)),
@@ -250,14 +249,14 @@ class NSEDataService:
                             "volume": int(nifty_data.get('totalTradedVolume', 0)),
                             "market_status": market_status
                         }
-                        
+
                         store.last_market_data = result
                         print(f"Fetched real NSE data (alternative): {result['last_price']}")
                         return result
-                        
+
         except Exception as e:
             print(f"Alternative NSE API error: {e}")
-        
+
         # Try using Yahoo Finance as backup
         try:
             url = "https://query1.finance.yahoo.com/v8/finance/chart/%5ENSEI"
@@ -265,16 +264,16 @@ class NSEDataService:
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             }
             response = requests.get(url, headers=headers, timeout=10)
-            
+
             if response.status_code == 200:
                 data = response.json()
                 result_data = data['chart']['result'][0]
                 current_price = result_data['meta']['regularMarketPrice']
                 previous_close = result_data['meta']['previousClose']
-                
+
                 change = current_price - previous_close
                 change_percent = (change / previous_close) * 100
-                
+
                 result = {
                     "last_price": float(current_price),
                     "change": float(change),
@@ -282,20 +281,20 @@ class NSEDataService:
                     "volume": int(result_data['meta'].get('regularMarketVolume', 0)),
                     "market_status": market_status
                 }
-                
+
                 store.last_market_data = result
                 print(f"Fetched real data from Yahoo Finance: {result['last_price']}")
                 return result
-                
+
         except Exception as e:
             print(f"Yahoo Finance API error: {e}")
-        
+
         # Return last stored real data with updated market status
         if store.last_market_data:
             store.last_market_data["market_status"] = market_status
             print(f"Using stored real data: {store.last_market_data['last_price']}")
             return store.last_market_data
-        
+
         # Only use fallback if no real data was ever fetched
         print("Using fallback data - no real data available")
         return {
@@ -309,7 +308,7 @@ class NSEDataService:
     def get_options_chain_data(self) -> List[OptionsData]:
         """Fetch options chain from NSE - only real data"""
         market_status = market_status_service.get_market_status()
-        
+
         # If market is closed, return stored real data if available
         if market_status != "OPEN":
             if store.options_chain:
@@ -319,23 +318,23 @@ class NSEDataService:
                 # Return empty list when no real data is available and market is closed
                 print(f"No options data available - Market is {market_status}")
                 return []
-        
+
         # Market is open - try to fetch live data
         try:
             # Try NSE API first
             url = f"{self.base_url}/option-chain-indices?symbol=NIFTY"
             response = self.session.get(url, timeout=15)
-            
+
             if response.status_code == 200:
                 data = response.json()
                 options = []
-                
+
                 records = data.get('records', {}).get('data', [])
                 for record in records[:10]:  # Get first 10 strikes
                     strike = record.get('strikePrice', 0)
                     ce_data = record.get('CE', {})
                     pe_data = record.get('PE', {})
-                    
+
                     if strike > 0:  # Only include valid strikes
                         options.append(OptionsData(
                             strike_price=float(strike),
@@ -345,16 +344,16 @@ class NSEDataService:
                             put_volume=int(pe_data.get('totalTradedVolume', 0)),
                             expiry_date=ce_data.get('expiryDate', '')
                         ))
-                
+
                 if options:
                     # Store real data for later use
                     store.options_chain = options
                     print(f"Fetched real options chain data: {len(options)} strikes")
                     return options
-                
+
         except Exception as e:
             print(f"NSE options chain API error: {e}")
-        
+
         # Try alternative Yahoo Finance options data
         try:
             # This is a placeholder - Yahoo Finance doesn't provide detailed options chain
@@ -362,16 +361,16 @@ class NSEDataService:
             pass
         except Exception as e:
             print(f"Alternative options API error: {e}")
-        
+
         # Return stored real data if available, otherwise empty
         if store.options_chain:
             print("Using previously stored real options data")
             return store.options_chain
-        
+
         print("No real options data available")
         return []
 
-    
+
 
 nse_service = NSEDataService()
 
@@ -397,16 +396,16 @@ class NewsFlashService:
             # MoneyControl Breaking News API
             url = "https://www.moneycontrol.com/news/business/"
             response = self.session.get(url, timeout=10)
-            
+
             if response.status_code == 200:
                 news_items = []
                 # Parse HTML content for news items
                 content = response.text
-                
+
                 # Extract news headlines and links using regex
                 headline_pattern = r'<a[^>]*href="([^"]*)"[^>]*class="[^"]*news-title[^"]*"[^>]*>([^<]+)</a>'
                 matches = re.findall(headline_pattern, content, re.IGNORECASE)
-                
+
                 for link, headline in matches[:10]:  # Top 10 headlines
                     if headline.strip() and link not in self.processed_headlines:
                         full_url = urljoin("https://www.moneycontrol.com", link)
@@ -416,12 +415,12 @@ class NewsFlashService:
                             'source': 'MoneyControl'
                         })
                         self.processed_headlines.add(link)
-                
+
                 return news_items
-                
+
         except Exception as e:
             print(f"MoneyControl news fetch error: {e}")
-        
+
         return []
 
     def get_economic_times_news(self) -> List[Dict]:
@@ -429,15 +428,15 @@ class NewsFlashService:
         try:
             url = "https://economictimes.indiatimes.com/markets/stocks/news"
             response = self.session.get(url, timeout=10)
-            
+
             if response.status_code == 200:
                 news_items = []
                 content = response.text
-                
+
                 # Extract headlines
                 headline_pattern = r'<a[^>]*href="([^"]*)"[^>]*>([^<]+)</a>'
                 matches = re.findall(headline_pattern, content)
-                
+
                 for link, headline in matches[:5]:
                     if len(headline.strip()) > 20 and 'market' in headline.lower() or 'stock' in headline.lower():
                         full_url = urljoin("https://economictimes.indiatimes.com", link)
@@ -446,12 +445,12 @@ class NewsFlashService:
                             'url': full_url,
                             'source': 'Economic Times'
                         })
-                
+
                 return news_items
-                
+
         except Exception as e:
             print(f"Economic Times news fetch error: {e}")
-        
+
         return []
 
     def get_reuters_india_news(self) -> List[Dict]:
@@ -459,15 +458,15 @@ class NewsFlashService:
         try:
             url = "https://www.reuters.com/world/india/"
             response = self.session.get(url, timeout=10)
-            
+
             if response.status_code == 200:
                 news_items = []
                 content = response.text
-                
+
                 # Look for breaking news or important headlines
                 headline_pattern = r'<h3[^>]*>.*?<a[^>]*href="([^"]*)"[^>]*>([^<]+)</a>'
                 matches = re.findall(headline_pattern, content, re.DOTALL)
-                
+
                 for link, headline in matches[:3]:
                     if len(headline.strip()) > 15:
                         full_url = urljoin("https://www.reuters.com", link)
@@ -476,26 +475,26 @@ class NewsFlashService:
                             'url': full_url,
                             'source': 'Reuters'
                         })
-                
+
                 return news_items
-                
+
         except Exception as e:
             print(f"Reuters news fetch error: {e}")
-        
+
         return []
 
     def analyze_news_sentiment(self, headline: str) -> Dict:
         """Analyze news sentiment and market impact"""
         headline_lower = headline.lower()
-        
+
         # High impact keywords
         high_impact_positive = ['surge', 'soar', 'rally', 'boom', 'breakthrough', 'record high', 'all-time high']
         high_impact_negative = ['crash', 'plunge', 'collapse', 'war', 'conflict', 'crisis', 'emergency', 'ban']
-        
+
         # Medium impact keywords
         medium_impact_positive = ['rise', 'gain', 'up', 'positive', 'growth', 'profit', 'deal', 'agreement']
         medium_impact_negative = ['fall', 'drop', 'decline', 'down', 'loss', 'cut', 'concern', 'worry']
-        
+
         # Category detection
         category = 'GENERAL'
         if any(word in headline_lower for word in ['war', 'military', 'conflict', 'attack', 'tension']):
@@ -508,12 +507,12 @@ class NewsFlashService:
             category = 'CORPORATE'
         elif any(word in headline_lower for word in ['global', 'international', 'world', 'china', 'usa', 'europe']):
             category = 'GLOBAL'
-        
+
         # Sentiment and impact analysis
         sentiment = 'NEUTRAL'
         impact = 'LOW'
         market_reaction = 'Minimal impact expected'
-        
+
         # Check for high impact words
         if any(word in headline_lower for word in high_impact_positive):
             sentiment = 'POSITIVE'
@@ -531,13 +530,13 @@ class NewsFlashService:
             sentiment = 'NEGATIVE'
             impact = 'MEDIUM'
             market_reaction = 'Moderate negative impact'
-        
+
         # Special cases for war/conflict
         if category == 'WAR':
             sentiment = 'NEGATIVE'
             impact = 'HIGH'
             market_reaction = 'Flight to safety - markets may decline'
-        
+
         return {
             'sentiment': sentiment,
             'impact': impact,
@@ -548,41 +547,41 @@ class NewsFlashService:
     def fetch_and_process_news(self) -> List[NewsFlash]:
         """Fetch news from all sources and process them"""
         all_news = []
-        
+
         # Fetch from all sources
         try:
             moneycontrol_news = self.get_moneycontrol_news()
             all_news.extend(moneycontrol_news)
         except Exception as e:
             print(f"MoneyControl fetch error: {e}")
-        
+
         try:
             et_news = self.get_economic_times_news()
             all_news.extend(et_news)
         except Exception as e:
             print(f"ET fetch error: {e}")
-        
+
         try:
             reuters_news = self.get_reuters_india_news()
             all_news.extend(reuters_news)
         except Exception as e:
             print(f"Reuters fetch error: {e}")
-        
+
         # Process news items
         processed_news = []
         for news_item in all_news:
             headline = news_item['headline']
-            
+
             # Skip if headline too short or already processed
             if len(headline) < 20 or headline in [n.headline for n in store.news_flashes[-10:]]:
                 continue
-            
+
             # Analyze sentiment and impact
             analysis = self.analyze_news_sentiment(headline)
-            
+
             # Create summary (first 100 chars + "...")
             summary = headline[:100] + "..." if len(headline) > 100 else headline
-            
+
             # Create news flash object
             news_flash = NewsFlash(
                 id=0,  # Will be set by store
@@ -596,9 +595,9 @@ class NewsFlashService:
                 timestamp=datetime.now().isoformat(),
                 market_reaction=analysis['market_reaction']
             )
-            
+
             processed_news.append(news_flash)
-        
+
         return processed_news
 
 news_service = NewsFlashService()
@@ -613,51 +612,51 @@ class ClaudeAIService:
         """Analyze market sentiment using Claude AI"""
         if not self.api_key:
             return self._fallback_sentiment_analysis(market_data)
-        
+
         try:
             prompt = f"""
             Analyze the current Nifty 50 market data and provide sentiment analysis:
-            
+
             Market Data:
             - Current Price: ₹{market_data['last_price']:.2f}
             - Change: {market_data['change']:+.2f} ({market_data['net_change']:+.2f}%)
             - Volume: {market_data['volume']:,}
             - Market Status: {market_data['market_status']}
-            
+
             Options Data Sample:
             {json.dumps([asdict(opt) for opt in options_data[:3]], indent=2)}
-            
+
             Please provide:
             1. Overall sentiment (BULLISH/BEARISH/NEUTRAL)
             2. Trading recommendation (BUY_CALL/BUY_PUT/DONT_TRADE)
             3. Brief reasoning (max 100 words)
-            
+
             Respond in JSON format:
             {{"sentiment": "BULLISH", "recommendation": "BUY_CALL", "reasoning": "Market shows..."}}
             """
-            
+
             headers = {
                 'Content-Type': 'application/json',
                 'x-api-key': self.api_key,
                 'anthropic-version': '2023-06-01'
             }
-            
+
             payload = {
                 'model': 'claude-3-sonnet-20240229',
                 'max_tokens': 200,
                 'messages': [{'role': 'user', 'content': prompt}]
             }
-            
+
             response = requests.post(self.api_url, headers=headers, json=payload, timeout=10)
-            
+
             if response.status_code == 200:
                 result = response.json()
                 content = result['content'][0]['text']
                 return json.loads(content)
-            
+
         except Exception as e:
             print(f"Claude AI error: {e}")
-        
+
         return self._fallback_sentiment_analysis(market_data)
 
     def _fallback_sentiment_analysis(self, market_data: Dict) -> Dict:
@@ -665,7 +664,7 @@ class ClaudeAIService:
         change = market_data.get('change', 0)
         change_percent = market_data.get('net_change', 0)
         market_status = market_data.get('market_status', 'UNKNOWN')
-        
+
         # If market is closed, analyze last known data
         if market_status != "OPEN":
             if abs(change_percent) > 0.5:
@@ -694,7 +693,7 @@ class ClaudeAIService:
                 sentiment = "NEUTRAL"
                 recommendation = "DONT_TRADE"
                 reasoning = "Low volatility, range-bound movement"
-        
+
         return {
             "sentiment": sentiment,
             "recommendation": recommendation,
@@ -713,15 +712,15 @@ class ZerodhaService:
     def get_nifty_quote(self) -> Dict:
         """Get Nifty quote with market status awareness"""
         market_status = market_status_service.get_market_status()
-        
+
         if market_status != "OPEN":
             # Use NSE service for closed market data
             return nse_service.get_nifty_data()
-        
+
         if not self.api_key or not self.access_token:
             # Use NSE service as fallback
             return nse_service.get_nifty_data()
-        
+
         try:
             headers = {
                 'Authorization': f'token {self.api_key}:{self.access_token}',
@@ -734,7 +733,7 @@ class ZerodhaService:
                 return data
         except Exception as e:
             print(f"Zerodha API error: {e}")
-        
+
         # Fallback to NSE service
         return nse_service.get_nifty_data()
 
@@ -765,13 +764,13 @@ class WhatsAppService:
             'BTST': '🌙',
             'POSITIONAL': '📊'
         }.get(signal.strategy_type, '📈')
-        
+
         risk_emoji = {
             'LOW': '🟢',
             'MEDIUM': '🟡',
             'HIGH': '🔴'
         }.get(signal.risk_level, '🟡')
-        
+
         message = f"""🚨 NIFINOVA AI SIGNAL 🚨
 
 {strategy_emoji} {signal.strategy_type} {signal.type} Signal
@@ -800,7 +799,7 @@ class WhatsAppService:
     def send_market_alert(self, phone_number: str, market_data: MarketData):
         """Send market sentiment alert via WhatsApp"""
         status_emoji = "🟢" if market_data.sentiment == "BULLISH" else "🔴" if market_data.sentiment == "BEARISH" else "🟡"
-        
+
         message = f"""{status_emoji} MARKET ALERT {status_emoji}
 
 📊 Nifty 50: ₹{market_data.price:.2f}
@@ -818,9 +817,9 @@ class WhatsAppService:
 
     def send_news_flash(self, phone_number: str, news: NewsFlash):
         """Send breaking news flash via WhatsApp"""
-        impact_emoji = "🚨" if news.impact == "HIGH" else "⚠️" if news.impact == "MEDIUM" else "ℹ️"
+        impact_emoji = "🚨" ifnews.impact == "HIGH" else "⚠️" if news.impact == "MEDIUM" else "ℹ️"
         sentiment_emoji = "📈" if news.sentiment == "POSITIVE" else "📉" if news.sentiment == "NEGATIVE" else "📊"
-        
+
         category_emoji = {
             'WAR': '⚔️',
             'ECONOMY': '💰',
@@ -829,7 +828,7 @@ class WhatsAppService:
             'GLOBAL': '🌍',
             'GENERAL': '📰'
         }.get(news.category, '📰')
-        
+
         message = f"""{impact_emoji} NEWS FLASH {impact_emoji}
 
 {category_emoji} {news.category} | {news.source}
@@ -851,10 +850,10 @@ class WhatsAppService:
         """Send next-day market prediction via WhatsApp"""
         direction_emoji = "🚀" if prediction['direction'] == "BULLISH" else "📉" if prediction['direction'] == "BEARISH" else "↔️"
         confidence_emoji = "🔥" if prediction['confidence'] > 80 else "⚡" if prediction['confidence'] > 60 else "📊"
-        
+
         drivers_text = "\n".join([f"• {driver}" for driver in prediction['key_drivers'][:3]])
         recommendations_text = "\n".join([f"• {rec['strategy']}: {rec['allocation']}" for rec in prediction['trading_recommendations'][:2]])
-        
+
         message = f"""{direction_emoji} NEXT DAY PREDICTION {direction_emoji}
 
 📅 Date: {prediction['prediction_date']}
@@ -923,13 +922,13 @@ class MarketPredictionService:
     def analyze_prediction_vectors(self, market_data: Dict, options_data: List[OptionsData], 
                                  recent_news: List[NewsFlash]) -> Dict:
         """Analyze multiple vectors for next-day prediction"""
-        
+
         current_price = market_data.get('last_price', 0)
         change = market_data.get('change', 0)
         volume = market_data.get('volume', 0)
-        
+
         vector_scores = {}
-        
+
         # 1. Price Action Vector (30% weight)
         price_momentum = change / current_price * 100 if current_price > 0 else 0
         if abs(price_momentum) > 1:
@@ -938,7 +937,7 @@ class MarketPredictionService:
             vector_scores['price_action'] = 70 if price_momentum > 0 else 30
         else:
             vector_scores['price_action'] = 50
-        
+
         # 2. Volume Analysis Vector (20% weight)
         avg_volume = 1200000
         volume_ratio = volume / avg_volume if volume > 0 else 0.5
@@ -948,7 +947,7 @@ class MarketPredictionService:
             vector_scores['volume_analysis'] = 65 if change > 0 else 35
         else:
             vector_scores['volume_analysis'] = 50
-        
+
         # 3. Technical Indicators Vector (25% weight)
         # Simulate technical analysis
         tech_score = 50
@@ -960,43 +959,43 @@ class MarketPredictionService:
             tech_score -= 25
         elif price_momentum < -0.5:
             tech_score -= 15
-        
+
         # Add volatility factor
         volatility = abs(price_momentum) * 2
         if volatility > 3:
             tech_score += 10  # High volatility can continue
-        
+
         vector_scores['technical_indicators'] = max(10, min(90, tech_score))
-        
+
         # 4. News Sentiment Vector (15% weight)
         news_score = 50
         high_impact_news = [n for n in recent_news if n.impact == 'HIGH']
         medium_impact_news = [n for n in recent_news if n.impact == 'MEDIUM']
-        
+
         for news in high_impact_news:
             if news.sentiment == 'POSITIVE':
                 news_score += 20
             elif news.sentiment == 'NEGATIVE':
                 news_score -= 20
-        
+
         for news in medium_impact_news:
             if news.sentiment == 'POSITIVE':
                 news_score += 10
             elif news.sentiment == 'NEGATIVE':
                 news_score -= 10
-        
+
         vector_scores['news_sentiment'] = max(10, min(90, news_score))
-        
+
         # 5. Global Markets Vector (10% weight)
         # Simulate global market analysis
         global_score = 50 + (price_momentum * 10)  # Correlation with local movement
         vector_scores['global_markets'] = max(20, min(80, global_score))
-        
+
         return vector_scores
 
-    def calculate_next_day_prediction(self, vector_scores: Dict) -> Dict:
+    def calculate_next_day_prediction(self, vector_scores: Dict, current_price = 19850) -> Dict:
         """Calculate comprehensive next-day prediction"""
-        
+
         # Weights for each vector
         weights = {
             'price_action': 0.30,
@@ -1005,13 +1004,13 @@ class MarketPredictionService:
             'news_sentiment': 0.15,
             'global_markets': 0.10
         }
-        
+
         # Calculate weighted score
         weighted_score = sum(
             vector_scores.get(vector, 50) * weight 
             for vector, weight in weights.items()
         )
-        
+
         # Determine prediction direction and confidence
         if weighted_score > 65:
             direction = "BULLISH"
@@ -1022,11 +1021,11 @@ class MarketPredictionService:
         else:
             direction = "SIDEWAYS"
             confidence = 100 - abs(weighted_score - 50) * 2
-        
+
         # Calculate price targets
-        current_price = 19850  # Base price for calculation
+        # current_price = 19850  # Base price for calculation
         volatility_factor = abs(weighted_score - 50) / 50 * 0.02  # 0-2% based on conviction
-        
+
         if direction == "BULLISH":
             target_high = current_price * (1 + volatility_factor + 0.005)
             target_low = current_price * (1 + 0.002)
@@ -1039,13 +1038,13 @@ class MarketPredictionService:
             target_high = current_price * (1 + 0.008)
             target_low = current_price * (1 - 0.008)
             probability_up = 50
-        
+
         # Generate trading recommendations
         recommendations = self._generate_trading_recommendations(direction, confidence, vector_scores)
-        
+
         # Risk factors
         risk_factors = self._identify_risk_factors(vector_scores)
-        
+
         return {
             'prediction_date': (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d'),
             'direction': direction,
@@ -1067,7 +1066,7 @@ class MarketPredictionService:
     def _generate_trading_recommendations(self, direction: str, confidence: float, vectors: Dict) -> List[Dict]:
         """Generate specific trading recommendations based on prediction"""
         recommendations = []
-        
+
         if confidence > 75:
             if direction == "BULLISH":
                 recommendations.extend([
@@ -1113,48 +1112,48 @@ class MarketPredictionService:
                 'risk_level': 'LOW',
                 'allocation': '100%'
             })
-        
+
         return recommendations
 
     def _identify_key_drivers(self, vectors: Dict) -> List[str]:
         """Identify the strongest prediction drivers"""
         sorted_vectors = sorted(vectors.items(), key=lambda x: abs(x[1] - 50), reverse=True)
-        
+
         drivers = []
         for vector, score in sorted_vectors[:3]:
             if abs(score - 50) > 15:
                 sentiment = "bullish" if score > 50 else "bearish"
                 drivers.append(f"{vector.replace('_', ' ').title()}: {sentiment} ({score:.0f}/100)")
-        
+
         return drivers
 
     def _identify_risk_factors(self, vectors: Dict) -> List[str]:
         """Identify potential risk factors"""
         risks = []
-        
+
         if vectors.get('news_sentiment', 50) < 30:
             risks.append("Negative news sentiment could impact market")
-        
+
         if vectors.get('volume_analysis', 50) < 40:
             risks.append("Low volume may indicate lack of conviction")
-        
+
         if abs(vectors.get('technical_indicators', 50) - 50) < 10:
             risks.append("Mixed technical signals reduce prediction reliability")
-        
+
         # Check for conflicting signals
         bullish_vectors = sum(1 for score in vectors.values() if score > 60)
         bearish_vectors = sum(1 for score in vectors.values() if score < 40)
-        
+
         if bullish_vectors > 0 and bearish_vectors > 0:
             risks.append("Conflicting signals across different analysis vectors")
-        
+
         return risks
 
     def _determine_market_regime(self, vectors: Dict) -> str:
         """Determine current market regime"""
         avg_score = sum(vectors.values()) / len(vectors)
         volatility = sum(abs(score - 50) for score in vectors.values()) / len(vectors)
-        
+
         if volatility > 20:
             return "High Volatility"
         elif avg_score > 60:
@@ -1167,7 +1166,7 @@ class MarketPredictionService:
     def _predict_volatility(self, vectors: Dict) -> str:
         """Predict next day volatility"""
         volatility_score = sum(abs(score - 50) for score in vectors.values()) / len(vectors)
-        
+
         if volatility_score > 25:
             return "High (>1.5%)"
         elif volatility_score > 15:
@@ -1182,60 +1181,60 @@ class AISignalsService:
 
     def calculate_technical_indicators(self, current_price: float, volume: int, market_data: Dict = None) -> Dict:
         """Calculate comprehensive technical indicators using OHLC and other parameters"""
-        
+
         # Simulate OHLC data based on current price and market movement
         change_percent = market_data.get('net_change', 0) if market_data else 0
-        
+
         # Generate realistic OHLC based on current price and volatility
         volatility_factor = abs(change_percent) / 100 + 0.005  # Base volatility
-        
+
         # Open price (previous day close approximation)
         open_price = current_price - market_data.get('change', 0) if market_data else current_price * (1 - volatility_factor)
-        
+
         # High and Low based on volatility
         daily_range = current_price * volatility_factor
         high_price = max(current_price, open_price) + daily_range * random.uniform(0.3, 0.7)
         low_price = min(current_price, open_price) - daily_range * random.uniform(0.3, 0.7)
-        
+
         # Ensure logical OHLC relationship
         high_price = max(high_price, current_price, open_price)
         low_price = min(low_price, current_price, open_price)
-        
+
         # Technical Indicators
         # RSI calculation (simplified)
         price_momentum = (current_price - open_price) / open_price * 100 if open_price > 0 else 0
         rsi = 50 + (price_momentum * 2)  # Base RSI around 50
         rsi = max(10, min(90, rsi + random.uniform(-10, 10)))
-        
+
         # Moving Averages
         sma20 = current_price * (0.995 + random.uniform(0, 0.01))  # Slight variation
         sma50 = current_price * (0.99 + random.uniform(0, 0.02))
         ema20 = current_price * (0.998 + random.uniform(0, 0.004))
-        
+
         # Bollinger Bands
         bb_upper = sma20 * 1.02
         bb_lower = sma20 * 0.98
         bb_position = (current_price - bb_lower) / (bb_upper - bb_lower) * 100
-        
+
         # MACD
         macd_line = (ema20 - sma20) / current_price * 1000
         macd_signal = macd_line * 0.8
         macd_histogram = macd_line - macd_signal
-        
+
         # Volatility indicators
         atr = (high_price - low_price) / current_price * 100  # Average True Range %
         volatility = abs(change_percent) * 2 + atr
-        
+
         # Volume analysis
         avg_volume = 1200000  # Average Nifty volume
         volume_ratio = volume / avg_volume if volume > 0 else 0.5
-        
+
         # Support and Resistance levels
         support_1 = low_price
         support_2 = low_price - (high_price - low_price) * 0.5
         resistance_1 = high_price
         resistance_2 = high_price + (high_price - low_price) * 0.5
-        
+
         return {
             'ohlc': {
                 'open': round(open_price, 2),
@@ -1271,19 +1270,19 @@ class AISignalsService:
 
     def analyze_market_conditions(self, indicators: Dict) -> Dict:
         """Enhanced market condition analysis using multiple technical factors"""
-        
+
         ohlc = indicators['ohlc']
         current_price = ohlc['close']
         open_price = ohlc['open']
         high_price = ohlc['high']
         low_price = ohlc['low']
-        
+
         # Price action analysis
         body_size = abs(current_price - open_price) / open_price * 100
         candle_range = (high_price - low_price) / low_price * 100
         upper_wick = (high_price - max(current_price, open_price)) / max(current_price, open_price) * 100
         lower_wick = (min(current_price, open_price) - low_price) / min(current_price, open_price) * 100
-        
+
         # Trend analysis
         trend = 'sideways'
         if indicators['sma20'] > indicators['sma50'] and current_price > indicators['sma20']:
@@ -1300,10 +1299,10 @@ class AISignalsService:
             trend = 'bullish'
         elif current_price < open_price and body_size > 0.5:
             trend = 'bearish'
-        
+
         # Strength calculation
         strength = 50
-        
+
         # RSI contribution
         if indicators['rsi'] > 70:
             strength += 20
@@ -1313,51 +1312,51 @@ class AISignalsService:
             strength += 20  # Oversold bounce potential
         elif indicators['rsi'] < 40:
             strength += 10
-        
+
         # Volume contribution
         if indicators['volume_ratio'] > 1.5:
             strength += 15
         elif indicators['volume_ratio'] > 1.2:
             strength += 10
-        
+
         # MACD contribution
         if indicators['macd']['histogram'] > 0:
             strength += 10
-        
+
         # Bollinger Band position
         bb_pos = indicators['bollinger']['position']
         if bb_pos > 80:  # Near upper band
             strength += 5
         elif bb_pos < 20:  # Near lower band
             strength += 10  # Potential bounce
-        
+
         # Volatility impact
         if indicators['volatility'] < 15:
             strength -= 5  # Low volatility
         elif indicators['volatility'] > 25:
             strength += 5  # High volatility
-        
+
         strength = max(30, min(95, strength))
-        
+
         # Momentum calculation
         momentum = 50
-        
+
         # Price momentum
         price_change = (current_price - open_price) / open_price * 100
         momentum += price_change * 10
-        
+
         # MACD momentum
         if indicators['macd']['line'] > indicators['macd']['signal']:
             momentum += 10
         else:
             momentum -= 10
-        
+
         # Volume momentum
         if indicators['volume_ratio'] > 1.0:
             momentum += indicators['volume_ratio'] * 5
-        
+
         momentum = max(20, min(90, momentum))
-        
+
         return {
             'trend': trend,
             'strength': round(strength, 1),
@@ -1372,7 +1371,7 @@ class AISignalsService:
 
     def analyze_trading_strategies(self, indicators: Dict, conditions: Dict, market_data: Dict) -> List[TradingStrategy]:
         """Analyze and recommend trading strategies based on market conditions"""
-        
+
         strategies = []
         current_price = indicators['ohlc']['close']
         volatility = indicators['volatility']
@@ -1382,36 +1381,36 @@ class AISignalsService:
         volume_ratio = indicators['volume_ratio']
         rsi = indicators['rsi']
         market_status = market_data.get('market_status', 'UNKNOWN')
-        
+
         # SCALPING Strategy Analysis
         scalping_score = 0
         scalping_reasons = []
-        
+
         # High volatility favors scalping
         if volatility > 20:
             scalping_score += 25
             scalping_reasons.append(f"High volatility ({volatility:.1f}%)")
-        
+
         # High volume supports scalping
         if volume_ratio > 1.3:
             scalping_score += 20
             scalping_reasons.append(f"Above average volume ({volume_ratio:.1f}x)")
-        
+
         # Strong momentum for quick moves
         if momentum > 65 or momentum < 35:
             scalping_score += 15
             scalping_reasons.append("Strong directional momentum")
-        
+
         # RSI extremes for quick reversals
         if rsi > 70 or rsi < 30:
             scalping_score += 10
             scalping_reasons.append(f"RSI extreme at {rsi:.1f}")
-        
+
         # Market must be open for scalping
         if market_status != "OPEN":
             scalping_score = 0
             scalping_reasons = ["Market not live"]
-        
+
         strategies.append(TradingStrategy(
             strategy_type="SCALPING",
             recommended=scalping_score >= 50,
@@ -1431,40 +1430,40 @@ class AISignalsService:
                 "Momentum reversal signals"
             ]
         ))
-        
+
         # INTRADAY Strategy Analysis
         intraday_score = 0
         intraday_reasons = []
-        
+
         # Good for trending markets
         if trend in ['bullish', 'bearish', 'strong_bullish', 'strong_bearish']:
             intraday_score += 20
             intraday_reasons.append(f"Clear {trend} trend")
-        
+
         # Moderate volatility ideal
         if 10 <= volatility <= 25:
             intraday_score += 15
             intraday_reasons.append("Optimal volatility range")
-        
+
         # Decent volume
         if volume_ratio > 0.8:
             intraday_score += 15
             intraday_reasons.append("Adequate volume")
-        
+
         # Market strength
         if strength > 60:
             intraday_score += 15
             intraday_reasons.append("Strong market conditions")
-        
+
         # Technical setup
         if 40 <= rsi <= 70:
             intraday_score += 10
             intraday_reasons.append("Healthy RSI levels")
-        
+
         # Always possible if market is open
         if market_status == "OPEN":
             intraday_score += 10
-        
+
         strategies.append(TradingStrategy(
             strategy_type="INTRADAY",
             recommended=intraday_score >= 45,
@@ -1484,38 +1483,38 @@ class AISignalsService:
                 "Trend reversal"
             ]
         ))
-        
+
         # BTST (Buy Today Sell Tomorrow) Strategy Analysis
         btst_score = 0
         btst_reasons = []
-        
+
         # Late session strength for BTST
         current_hour = datetime.now().hour
         if 13 <= current_hour <= 15 and market_status == "OPEN":  # Last 2 hours
             if trend in ['bullish', 'strong_bullish'] and momentum > 60:
                 btst_score += 25
                 btst_reasons.append("Late session bullish momentum")
-        
+
         # Strong closing above key levels
         if indicators['bollinger']['position'] > 60:
             btst_score += 15
             btst_reasons.append("Closing near upper Bollinger band")
-        
+
         # Momentum continuation
         if indicators['macd']['histogram'] > 0 and momentum > 55:
             btst_score += 20
             btst_reasons.append("Positive MACD momentum")
-        
+
         # Volume confirmation
         if volume_ratio > 1.1:
             btst_score += 10
             btst_reasons.append("Volume supports move")
-        
+
         # Market sentiment
         if strength > 65:
             btst_score += 10
             btst_reasons.append("Strong market sentiment")
-        
+
         strategies.append(TradingStrategy(
             strategy_type="BTST",
             recommended=btst_score >= 40,
@@ -1535,37 +1534,37 @@ class AISignalsService:
                 "Morning weakness exit"
             ]
         ))
-        
+
         # POSITIONAL Strategy Analysis
         positional_score = 0
         positional_reasons = []
-        
+
         # Strong sustained trends
         if trend in ['strong_bullish', 'strong_bearish']:
             positional_score += 30
             positional_reasons.append(f"Strong {trend.replace('_', ' ')} trend")
-        
+
         # Technical setup alignment
         if indicators['sma20'] > indicators['sma50']:
             if trend in ['bullish', 'strong_bullish']:
                 positional_score += 20
                 positional_reasons.append("Moving averages aligned")
-        
+
         # RSI not in extreme zones
         if 35 <= rsi <= 65:
             positional_score += 15
             positional_reasons.append("RSI in sustainable range")
-        
+
         # Momentum sustainability
         if 55 <= momentum <= 80:
             positional_score += 15
             positional_reasons.append("Sustainable momentum")
-        
+
         # Market structure
         if strength > 70:
             positional_score += 10
             positional_reasons.append("Strong market structure")
-        
+
         strategies.append(TradingStrategy(
             strategy_type="POSITIONAL",
             recommended=positional_score >= 50,
@@ -1585,67 +1584,67 @@ class AISignalsService:
                 "Key resistance breaks"
             ]
         ))
-        
+
         # Sort strategies by confidence
         strategies.sort(key=lambda x: x.confidence, reverse=True)
-        
+
         return strategies
 
     def generate_trading_signal(self, current_price: float, indicators: Dict, conditions: Dict, strategies: List[TradingStrategy]) -> TradingSignal:
         """Generate enhanced trading signal with OHLC-based analysis"""
-        
+
         ohlc = indicators['ohlc']
         support_resistance = indicators['support_resistance']
-        
+
         # Determine signal type based on comprehensive analysis
         bullish_signals = 0
         bearish_signals = 0
-        
+
         # Trend analysis
         if conditions['trend'] in ['bullish', 'strong_bullish']:
             bullish_signals += 2
         elif conditions['trend'] in ['bearish', 'strong_bearish']:
             bearish_signals += 2
-        
+
         # Price action
         if current_price > ohlc['open']:
             bullish_signals += 1
         else:
             bearish_signals += 1
-        
+
         # RSI analysis
         if indicators['rsi'] < 35:  # Oversold
             bullish_signals += 2
         elif indicators['rsi'] > 65:  # Overbought
             bearish_signals += 2
-        
+
         # MACD analysis
         if indicators['macd']['histogram'] > 0:
             bullish_signals += 1
         else:
             bearish_signals += 1
-        
+
         # Bollinger Band position
         bb_pos = indicators['bollinger']['position']
         if bb_pos < 25:  # Near lower band
             bullish_signals += 1
         elif bb_pos > 75:  # Near upper band
             bearish_signals += 1
-        
+
         # Volume confirmation
         if indicators['volume_ratio'] > 1.2:
             if current_price > ohlc['open']:
                 bullish_signals += 1
             else:
                 bearish_signals += 1
-        
+
         # Final signal determination
         is_call = bullish_signals > bearish_signals
         signal_type = 'CALL' if is_call else 'PUT'
-        
+
         # Generate strike price based on support/resistance
         base_strike = round(current_price / 50) * 50
-        
+
         if is_call:
             # For CALL, choose strikes near current price or slight OTM
             if current_price > support_resistance['resistance_1'] * 0.995:
@@ -1658,12 +1657,12 @@ class AISignalsService:
                 strike_price = base_strike - 50  # OTM
             else:
                 strike_price = base_strike  # ATM
-        
+
         # Calculate confidence based on signal strength
         confidence = 60
         signal_strength = abs(bullish_signals - bearish_signals)
         confidence += signal_strength * 8
-        
+
         # Additional confidence factors
         if conditions['strength'] > 75:
             confidence += 10
@@ -1673,46 +1672,46 @@ class AISignalsService:
             confidence += 5
         if abs(indicators['macd']['histogram']) > 0.5:
             confidence += 5
-        
+
         confidence = max(60, min(95, confidence))
-        
+
         # Calculate option premium estimate
         distance_from_spot = abs(strike_price - current_price)
         time_value = 15 + (indicators['volatility'] * 2)  # Base time value
         intrinsic_value = max(0, current_price - strike_price) if is_call else max(0, strike_price - current_price)
         base_premium = intrinsic_value + time_value + (distance_from_spot * 0.1)
-        
+
         # Adjust premium based on volatility and time
         volatility_premium = indicators['volatility'] * 1.5
         base_premium += volatility_premium
-        
+
         # Target and Stop Loss calculation using technical levels
         if is_call:
             # Target based on resistance levels and volatility
             next_resistance = support_resistance['resistance_1']
             price_target = max(next_resistance, current_price + (indicators['atr'] * current_price / 100))
             option_target_multiplier = 1.8 + (indicators['volatility'] / 50)
-            
+
             # Stop loss based on support
             support_level = support_resistance['support_1']
             stop_multiplier = 0.3 + (indicators['volatility'] / 100)
-            
+
         else:
             # Target based on support levels
             next_support = support_resistance['support_1']
             price_target = min(next_support, current_price - (indicators['atr'] * current_price / 100))
             option_target_multiplier = 1.8 + (indicators['volatility'] / 50)
-            
+
             # Stop loss based on resistance
             resistance_level = support_resistance['resistance_1']
             stop_multiplier = 0.3 + (indicators['volatility'] / 100)
-        
+
         target_price = base_premium * option_target_multiplier
         stop_loss = base_premium * stop_multiplier
-        
+
         # Generate detailed reasoning
         reasons = []
-        
+
         # Technical reasons
         if signal_type == 'CALL':
             if indicators['rsi'] < 40:
@@ -1732,28 +1731,28 @@ class AISignalsService:
                 reasons.append("MACD bearish momentum")
             if bb_pos > 70:
                 reasons.append("Near Bollinger upper band")
-        
+
         # Volume and volatility
         if indicators['volume_ratio'] > 1.3:
             reasons.append("High volume confirmation")
         if indicators['volatility'] > 20:
             reasons.append("Elevated volatility")
-        
+
         # OHLC pattern
         candle = conditions['candle_pattern']
         if candle['body_size'] > 1:
             reasons.append(f"Strong {candle['type']} candle")
-        
+
         reasoning = '. '.join(reasons[:3]) + f". ATR: {indicators['atr']:.1f}%, Vol: {indicators['volatility']:.1f}%"
-        
+
         # Determine best strategy for this signal
         recommended_strategies = [s for s in strategies if s.recommended]
         best_strategy = recommended_strategies[0] if recommended_strategies else strategies[0]
-        
+
         # Adjust signal parameters based on strategy
         strategy_type = best_strategy.strategy_type
         risk_level = best_strategy.risk_level
-        
+
         # Strategy-specific adjustments
         if strategy_type == "SCALPING":
             target_price *= 0.6  # Smaller targets for scalping
@@ -1772,7 +1771,7 @@ class AISignalsService:
         else:  # INTRADAY
             strategy_reasoning = f"Intraday Setup: {best_strategy.reasoning}"
             holding_period = "Few hours"
-        
+
         return TradingSignal(
             id=0,  # Will be set by store
             type=signal_type,
@@ -1796,11 +1795,11 @@ class AISignalsService:
             current_price = nifty_data['last_price']
             volume = nifty_data['volume']
             market_status = nifty_data.get('market_status', 'UNKNOWN')
-            
+
             # Get options data
             options_data = zerodha_service.get_options_chain()
             store.options_chain = options_data
-            
+
             # Check for breaking news (every 5 minutes)
             current_time = datetime.now()
             if (current_time - news_service.last_check).total_seconds() > 300:  # 5 minutes
@@ -1808,25 +1807,25 @@ class AISignalsService:
                 for news in breaking_news:
                     if news.impact in ['HIGH', 'MEDIUM']:  # Only important news
                         stored_news = store.add_news_flash(news)
-                        
+
                         # Send WhatsApp alerts for high impact news
                         if news.impact == 'HIGH':
                             for user in store.whatsapp_users:
                                 if user.is_active:
                                     whatsapp_service.send_news_flash(user.phone_number, news)
-                        
+
                         # Emit news flash to dashboard
                         socketio.emit('news_flash', {
                             'news': asdict(stored_news)
                         })
-                        
+
                         print(f"NEWS FLASH: {news.headline[:50]}... | Impact: {news.impact} | Sentiment: {news.sentiment}")
-                
+
                 news_service.last_check = current_time
-            
+
             # Get AI sentiment analysis
             sentiment_analysis = claude_service.analyze_market_sentiment(nifty_data, options_data)
-            
+
             # Create market data with sentiment
             market_data = MarketData(
                 symbol='NIFTY50',
@@ -1840,7 +1839,7 @@ class AISignalsService:
                 flash_message=self._format_flash_message(sentiment_analysis.get('recommendation', 'DONT_TRADE'), market_status)
             )
             store.market_data['NIFTY50'] = market_data
-            
+
             # Generate signals only if market is open or near close
             new_signals = []
             if market_status in ["OPEN"]:  # Only generate signals when market is actually open
@@ -1848,65 +1847,65 @@ class AISignalsService:
                 indicators = self.calculate_technical_indicators(current_price, volume, nifty_data)
                 conditions = self.analyze_market_conditions(indicators)
                 strategies = self.analyze_trading_strategies(indicators, conditions, nifty_data)
-                
+
                 # Store strategies for API access
                 store.trading_strategies = strategies
-                
+
                 # Generate 1-2 signals
                 num_signals = random.randint(1, 2)
-                
+
                 for _ in range(num_signals):
                     signal = self.generate_trading_signal(current_price, indicators, conditions, strategies)
                     stored_signal = store.add_trading_signal(signal)
                     new_signals.append(stored_signal)
-                    
+
                     # Send WhatsApp notifications for high confidence signals
                     if signal.confidence >= 90:
                         for user in store.whatsapp_users:
                             if user.is_active:
                                 whatsapp_service.send_trading_signal(user.phone_number, signal)
-            
+
             # Generate next-day predictions when market closes
             if market_status == "CLOSED":
                 try:
                     # Generate comprehensive next-day prediction
                     recent_news = store.get_recent_news(hours=24)  # Last 24 hours of news
                     vector_scores = prediction_service.analyze_prediction_vectors(nifty_data, options_data, recent_news)
-                    next_day_prediction = prediction_service.calculate_next_day_prediction(vector_scores)
-                    
+                    next_day_prediction = prediction_service.calculate_next_day_prediction(vector_scores, nifty_data.get('last_price'))
+
                     # Store prediction for API access
                     store.next_day_prediction = next_day_prediction
-                    
+
                     # Emit prediction to dashboard
                     socketio.emit('next_day_prediction', {
                         'prediction': next_day_prediction
                     })
-                    
+
                     # Send WhatsApp alerts for next-day predictions
                     for user in store.whatsapp_users:
                         if user.is_active:
                             whatsapp_service.send_next_day_prediction(user.phone_number, next_day_prediction)
-                    
+
                     print(f"Next-day prediction generated: {next_day_prediction['direction']} with {next_day_prediction['confidence']}% confidence")
-                    
+
                 except Exception as e:
                     print(f"Error generating next-day prediction: {e}")
-                
+
                 # Send market alerts if sentiment changed significantly
                 if sentiment_analysis.get('sentiment') != 'NEUTRAL':
                     for user in store.whatsapp_users:
                         if user.is_active:
                             whatsapp_service.send_market_alert(user.phone_number, market_data)
-            
+
             # Emit real-time updates
             socketio.emit('market_update', {
                 'nifty_data': asdict(market_data),
                 'new_signals': [asdict(s) for s in new_signals],
                 'options_chain': [asdict(o) for o in options_data]
             })
-            
+
             print(f"Market: {market_status} | Nifty: {current_price:.2f} | Sentiment: {sentiment_analysis.get('sentiment')} | Signals: {len(new_signals)}")
-            
+
         except Exception as e:
             print(f"Error generating signals: {e}")
 
@@ -1914,7 +1913,7 @@ class AISignalsService:
         """Format trading recommendation as flash message"""
         if market_status != "OPEN":
             return f"📴 MARKET NOT LIVE - {market_status}"
-        
+
         messages = {
             "BUY_CALL": "🚀 BUY CALL - Bullish momentum detected!",
             "BUY_PUT": "📉 BUY PUT - Bearish pressure building!",
@@ -1925,9 +1924,9 @@ class AISignalsService:
     def start_signal_generation(self):
         if self.is_running:
             return
-        
+
         self.is_running = True
-        
+
         def signal_loop():
             while self.is_running:
                 self.generate_signals()
@@ -1935,7 +1934,7 @@ class AISignalsService:
                 market_status = market_status_service.get_market_status()
                 sleep_time = 5 if market_status == "OPEN" else 30  # 5 sec when open, 30 sec when closed
                 time.sleep(sleep_time)
-        
+
         thread = threading.Thread(target=signal_loop, daemon=True)
         thread.start()
 
@@ -1955,15 +1954,15 @@ def login():
         data = request.get_json()
         username = data.get('username')
         password = data.get('password')
-        
+
         for user in store.users:
             if user['username'] == username and user['password'] == password:
                 session['user_id'] = user['id']
                 session['username'] = username
                 return jsonify({'success': True, 'user': {'id': user['id'], 'username': username}})
-        
+
         return jsonify({'success': False, 'message': 'Invalid credentials'}), 401
-    
+
     return render_template('login.html')
 
 @app.route('/logout', methods=['POST'])
@@ -1976,13 +1975,13 @@ def logout():
 def market_overview():
     nifty_data = store.market_data.get('NIFTY50')
     active_signals = store.get_active_signals()
-    
+
     if not nifty_data:
         # Generate initial data
         quote = zerodha_service.get_nifty_quote()
         options_data = zerodha_service.get_options_chain()
         sentiment_analysis = claude_service.analyze_market_sentiment(quote, options_data)
-        
+
         nifty_data = MarketData(
             symbol='NIFTY50',
             price=quote['last_price'],
@@ -1995,7 +1994,7 @@ def market_overview():
             flash_message=ai_service._format_flash_message(sentiment_analysis.get('recommendation', 'DONT_TRADE'))
         )
         store.market_data['NIFTY50'] = nifty_data
-    
+
     return jsonify({
         'nifty50': asdict(nifty_data),
         'active_signals': len(active_signals),
@@ -2017,19 +2016,19 @@ def whatsapp_users():
     if request.method == 'GET':
         active_users = [u for u in store.whatsapp_users if u.is_active]
         return jsonify([asdict(u) for u in active_users])
-    
+
     elif request.method == 'POST':
         data = request.get_json()
         phone_number = data.get('phone_number', '').strip()
-        
+
         if not phone_number:
             return jsonify({'error': 'Phone number required'}), 400
-        
+
         # Check if already exists
         for user in store.whatsapp_users:
             if user.phone_number == phone_number and user.is_active:
                 return jsonify({'error': 'Phone number already registered'}), 400
-        
+
         user = store.add_whatsapp_user(phone_number)
         return jsonify(asdict(user))
 
@@ -2044,7 +2043,7 @@ def remove_whatsapp_user(phone_number):
 def options_chain():
     options_data = zerodha_service.get_options_chain()
     market_status = market_status_service.get_market_status()
-    
+
     return jsonify({
         'options': [asdict(o) for o in options_data],
         'market_status': market_status,
@@ -2073,12 +2072,12 @@ def check_news():
     """Manually trigger news check"""
     breaking_news = news_service.fetch_and_process_news()
     new_flashes = []
-    
+
     for news in breaking_news:
         if news.impact in ['HIGH', 'MEDIUM']:
             stored_news = store.add_news_flash(news)
             new_flashes.append(stored_news)
-    
+
     return jsonify({
         'new_flashes': len(new_flashes),
         'flashes': [asdict(news) for news in new_flashes]
@@ -2088,23 +2087,23 @@ def check_news():
 def get_trading_strategies():
     """Get current trading strategy recommendations"""
     strategies = getattr(store, 'trading_strategies', [])
-    
+
     if not strategies:
         # Generate fresh strategy analysis
         try:
             nifty_data = zerodha_service.get_nifty_quote()
             current_price = nifty_data['last_price']
             volume = nifty_data['volume']
-            
+
             indicators = ai_service.calculate_technical_indicators(current_price, volume, nifty_data)
             conditions = ai_service.analyze_market_conditions(indicators)
             strategies = ai_service.analyze_trading_strategies(indicators, conditions, nifty_data)
-            
+
             store.trading_strategies = strategies
         except Exception as e:
             print(f"Error generating strategies: {e}")
             strategies = []
-    
+
     return jsonify({
         'strategies': [asdict(strategy) for strategy in strategies],
         'timestamp': datetime.now().isoformat(),
@@ -2115,31 +2114,31 @@ def get_trading_strategies():
 def get_next_day_prediction():
     """Get next-day market prediction"""
     market_status = market_status_service.get_market_status()
-    
+
     # Generate fresh prediction if market is closed and no prediction exists
     if market_status in ["CLOSED", "WEEKEND"] and not getattr(store, 'next_day_prediction', None):
         try:
             nifty_data = zerodha_service.get_nifty_quote()
             options_data = zerodha_service.get_options_chain()
             recent_news = store.get_recent_news(hours=24)
-            
+
             vector_scores = prediction_service.analyze_prediction_vectors(nifty_data, options_data, recent_news)
-            prediction = prediction_service.calculate_next_day_prediction(vector_scores)
-            
+            prediction = prediction_service.calculate_next_day_prediction(vector_scores, nifty_data.get('last_price'))
+
             store.next_day_prediction = prediction
         except Exception as e:
             print(f"Error generating prediction: {e}")
             return jsonify({'error': 'Unable to generate prediction'}), 500
-    
+
     prediction = getattr(store, 'next_day_prediction', None)
-    
+
     if not prediction:
         return jsonify({
             'message': 'Next-day prediction available only after market close',
             'market_status': market_status,
             'available': False
         })
-    
+
     return jsonify({
         'prediction': prediction,
         'market_status': market_status,
@@ -2154,17 +2153,17 @@ def generate_next_day_prediction():
         nifty_data = zerodha_service.get_nifty_quote()
         options_data = zerodha_service.get_options_chain()
         recent_news = store.get_recent_news(hours=24)
-        
+
         vector_scores = prediction_service.analyze_prediction_vectors(nifty_data, options_data, recent_news)
-        prediction = prediction_service.calculate_next_day_prediction(vector_scores)
-        
+        prediction = prediction_service.calculate_next_day_prediction(vector_scores, nifty_data.get('last_price'))
+
         store.next_day_prediction = prediction
-        
+
         # Emit to connected clients
         socketio.emit('next_day_prediction', {
             'prediction': prediction
         })
-        
+
         return jsonify({
             'success': True,
             'prediction': prediction
@@ -2186,10 +2185,10 @@ def on_disconnect():
 if __name__ == '__main__':
     # Start AI signal generation
     ai_service.start_signal_generation()
-    
+
     # Run the app
     print("Starting Nifty AI Trading Assistant...")
     print("URL: http://localhost:5000")
     print("Login: pkrsolution / prabhanjan2025")
-    
+
     socketio.run(app, host='0.0.0.0', port=5000, debug=False, allow_unsafe_werkzeug=True, use_reloader=False, log_output=True)
