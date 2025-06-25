@@ -193,6 +193,28 @@
             </div>
         </div>
 
+        <!-- Next Day Prediction Section -->
+        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow-md p-6 mb-6 border border-blue-200">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-800">🔮 Next Day Market Prediction</h2>
+                <div class="flex space-x-2">
+                    <button onclick="generatePrediction()" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg text-sm">
+                        Generate Prediction
+                    </button>
+                    <button onclick="loadNextDayPrediction()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">
+                        Refresh
+                    </button>
+                </div>
+            </div>
+
+            <div id="predictionContainer" class="space-y-4">
+                <div class="text-center py-8 text-gray-500">
+                    <div class="mb-2">📊</div>
+                    <div>Next-day prediction will be available after market close</div>
+                </div>
+            </div>
+        </div>
+
         <!-- Trading Strategies Section -->
         <div class="bg-white rounded-lg shadow-md p-6 mb-6">
             <div class="flex justify-between items-center mb-4">
@@ -754,6 +776,171 @@
         loadTradingStrategies();
     }
 
+    // Load next-day prediction
+    function loadNextDayPrediction() {
+        fetch('/api/prediction/next-day')
+            .then(response => response.json())
+            .then(data => {
+                const container = document.getElementById('predictionContainer');
+                
+                if (!data.available) {
+                    container.innerHTML = `
+                        <div class="text-center py-8 text-gray-500">
+                            <div class="mb-2">📊</div>
+                            <div>${data.message}</div>
+                            <div class="text-sm mt-2">Market Status: ${data.market_status.replace('_', ' ')}</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const prediction = data.prediction;
+                const directionColor = prediction.direction === 'BULLISH' ? 'text-green-600' : prediction.direction === 'BEARISH' ? 'text-red-600' : 'text-gray-600';
+                const directionBg = prediction.direction === 'BULLISH' ? 'bg-green-100' : prediction.direction === 'BEARISH' ? 'bg-red-100' : 'bg-gray-100';
+                const confidenceColor = prediction.confidence > 80 ? 'text-green-600' : prediction.confidence > 60 ? 'text-yellow-600' : 'text-red-600';
+
+                container.innerHTML = `
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <!-- Main Prediction -->
+                        <div class="lg:col-span-1">
+                            <div class="bg-white rounded-lg p-6 shadow-sm border">
+                                <div class="text-center mb-4">
+                                    <div class="text-3xl mb-2">
+                                        ${prediction.direction === 'BULLISH' ? '🚀' : prediction.direction === 'BEARISH' ? '📉' : '↔️'}
+                                    </div>
+                                    <h3 class="text-xl font-bold ${directionColor}">${prediction.direction}</h3>
+                                    <p class="text-sm text-gray-600">for ${prediction.prediction_date}</p>
+                                </div>
+                                
+                                <div class="space-y-3">
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Confidence:</span>
+                                        <span class="font-semibold ${confidenceColor}">${prediction.confidence}%</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Probability Up:</span>
+                                        <span class="font-semibold">${prediction.probability_up}%</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Market Regime:</span>
+                                        <span class="font-semibold">${prediction.market_regime}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Volatility:</span>
+                                        <span class="font-semibold">${prediction.volatility_outlook}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Price Targets & Analysis -->
+                        <div class="lg:col-span-2">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <!-- Price Targets -->
+                                <div class="bg-white rounded-lg p-4 shadow-sm border">
+                                    <h4 class="font-semibold text-gray-800 mb-3">💹 Price Targets</h4>
+                                    <div class="space-y-2 text-sm">
+                                        <div class="flex justify-between">
+                                            <span>Expected High:</span>
+                                            <span class="font-medium text-green-600">₹${prediction.price_targets.high}</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span>Expected Low:</span>
+                                            <span class="font-medium text-red-600">₹${prediction.price_targets.low}</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span>Range:</span>
+                                            <span class="font-medium">₹${prediction.price_targets.expected_range}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Key Drivers -->
+                                <div class="bg-white rounded-lg p-4 shadow-sm border">
+                                    <h4 class="font-semibold text-gray-800 mb-3">🔍 Key Drivers</h4>
+                                    <div class="space-y-1 text-sm">
+                                        ${prediction.key_drivers.map(driver => `
+                                            <div class="text-gray-700">• ${driver}</div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Trading Recommendations -->
+                            <div class="bg-white rounded-lg p-4 shadow-sm border">
+                                <h4 class="font-semibold text-gray-800 mb-3">📋 Trading Recommendations</h4>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    ${prediction.trading_recommendations.map(rec => {
+                                        const riskColor = rec.risk_level === 'LOW' ? 'text-green-600' : rec.risk_level === 'HIGH' ? 'text-red-600' : 'text-yellow-600';
+                                        return `
+                                            <div class="border border-gray-200 rounded p-3">
+                                                <div class="font-medium text-gray-800">${rec.strategy}</div>
+                                                <div class="text-sm text-gray-600 mt-1">${rec.reasoning}</div>
+                                                <div class="flex justify-between mt-2 text-xs">
+                                                    <span class="${riskColor}">${rec.risk_level} Risk</span>
+                                                    <span class="font-medium">${rec.allocation}</span>
+                                                </div>
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+
+                            ${prediction.risk_factors && prediction.risk_factors.length > 0 ? `
+                                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
+                                    <h4 class="font-semibold text-yellow-800 mb-2">⚠️ Risk Factors</h4>
+                                    <div class="space-y-1 text-sm text-yellow-700">
+                                        ${prediction.risk_factors.map(risk => `<div>• ${risk}</div>`).join('')}
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            })
+            .catch(error => {
+                console.error('Error loading prediction:', error);
+                document.getElementById('predictionContainer').innerHTML = 
+                    '<div class="text-center py-8 text-red-500">Error loading prediction</div>';
+            });
+    }
+
+    // Generate new prediction
+    function generatePrediction() {
+        const button = event.target;
+        button.disabled = true;
+        button.textContent = 'Generating...';
+
+        fetch('/api/prediction/generate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                loadNextDayPrediction();
+            } else {
+                alert('Error generating prediction: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error generating prediction:', error);
+            alert('Error generating prediction');
+        })
+        .finally(() => {
+            button.disabled = false;
+            button.textContent = 'Generate Prediction';
+        });
+    }
+
+    // Listen for real-time prediction updates
+    socket.on('next_day_prediction', function(data) {
+        console.log('Next-day prediction received:', data);
+        loadNextDayPrediction();
+    });
+
     // Initial load
     loadMarketOverview();
     loadSignals();
@@ -761,6 +948,7 @@
     loadWhatsAppUsers();
     loadNewsFlash();
     loadTradingStrategies();
+    loadNextDayPrediction();
 
     // Refresh data periodically
     setInterval(loadMarketOverview, 30000); // Every 30 seconds
@@ -768,5 +956,6 @@
     setInterval(loadWhatsAppUsers, 300000); // Every 5 minutes
     setInterval(loadNewsFlash, 120000);     // Every 2 minutes
     setInterval(loadTradingStrategies, 45000); // Refresh strategies every 45 seconds
+    setInterval(loadNextDayPrediction, 600000); // Refresh prediction every 10 minutes
 </script>
 {% endblock %}

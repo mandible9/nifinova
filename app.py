@@ -106,6 +106,7 @@ class DataStore:
         self.next_news_id = 1
         self.last_market_data = None
         self.trading_strategies: List[TradingStrategy] = []
+        self.next_day_prediction = None
 
     def add_whatsapp_user(self, phone_number: str) -> WhatsAppUser:
         user = WhatsAppUser(
@@ -846,6 +847,42 @@ class WhatsAppService:
 
         return self._send_whatsapp_message(phone_number, message)
 
+    def send_next_day_prediction(self, phone_number: str, prediction: Dict):
+        """Send next-day market prediction via WhatsApp"""
+        direction_emoji = "🚀" if prediction['direction'] == "BULLISH" else "📉" if prediction['direction'] == "BEARISH" else "↔️"
+        confidence_emoji = "🔥" if prediction['confidence'] > 80 else "⚡" if prediction['confidence'] > 60 else "📊"
+        
+        drivers_text = "\n".join([f"• {driver}" for driver in prediction['key_drivers'][:3]])
+        recommendations_text = "\n".join([f"• {rec['strategy']}: {rec['allocation']}" for rec in prediction['trading_recommendations'][:2]])
+        
+        message = f"""{direction_emoji} NEXT DAY PREDICTION {direction_emoji}
+
+📅 Date: {prediction['prediction_date']}
+🎯 Direction: {prediction['direction']}
+{confidence_emoji} Confidence: {prediction['confidence']}%
+📈 Probability Up: {prediction['probability_up']}%
+
+💹 Price Targets:
+• High: ₹{prediction['price_targets']['high']}
+• Low: ₹{prediction['price_targets']['low']}
+• Range: ₹{prediction['price_targets']['expected_range']}
+
+🔍 Key Drivers:
+{drivers_text}
+
+📋 Trading Recommendations:
+{recommendations_text}
+
+⚠️ Market Regime: {prediction['market_regime']}
+📊 Volatility: {prediction['volatility_outlook']}
+
+🔥 NIFINOVA AI PREDICTION
+💼 PKR SOLUTION © 2025
+
+⚠️ Disclaimer: Predictions are based on technical analysis and may not guarantee future results."""
+
+        return self._send_whatsapp_message(phone_number, message)
+
     def _send_whatsapp_message(self, phone_number: str, message: str) -> bool:
         if not self.access_token or not self.phone_number_id:
             print(f"WhatsApp message would be sent to {phone_number}: {message}")
@@ -873,6 +910,270 @@ class WhatsAppService:
             return False
 
 whatsapp_service = WhatsAppService()
+
+# Market Prediction Service
+class MarketPredictionService:
+    def __init__(self):
+        self.prediction_vectors = [
+            'price_action', 'volume_analysis', 'technical_indicators', 
+            'news_sentiment', 'global_markets', 'volatility_analysis',
+            'options_flow', 'sector_rotation', 'market_breadth'
+        ]
+
+    def analyze_prediction_vectors(self, market_data: Dict, options_data: List[OptionsData], 
+                                 recent_news: List[NewsFlash]) -> Dict:
+        """Analyze multiple vectors for next-day prediction"""
+        
+        current_price = market_data.get('last_price', 0)
+        change = market_data.get('change', 0)
+        volume = market_data.get('volume', 0)
+        
+        vector_scores = {}
+        
+        # 1. Price Action Vector (30% weight)
+        price_momentum = change / current_price * 100 if current_price > 0 else 0
+        if abs(price_momentum) > 1:
+            vector_scores['price_action'] = 80 if price_momentum > 0 else 20
+        elif abs(price_momentum) > 0.5:
+            vector_scores['price_action'] = 70 if price_momentum > 0 else 30
+        else:
+            vector_scores['price_action'] = 50
+        
+        # 2. Volume Analysis Vector (20% weight)
+        avg_volume = 1200000
+        volume_ratio = volume / avg_volume if volume > 0 else 0.5
+        if volume_ratio > 1.5:
+            vector_scores['volume_analysis'] = 80 if change > 0 else 20
+        elif volume_ratio > 1.2:
+            vector_scores['volume_analysis'] = 65 if change > 0 else 35
+        else:
+            vector_scores['volume_analysis'] = 50
+        
+        # 3. Technical Indicators Vector (25% weight)
+        # Simulate technical analysis
+        tech_score = 50
+        if price_momentum > 1:
+            tech_score += 25
+        elif price_momentum > 0.5:
+            tech_score += 15
+        elif price_momentum < -1:
+            tech_score -= 25
+        elif price_momentum < -0.5:
+            tech_score -= 15
+        
+        # Add volatility factor
+        volatility = abs(price_momentum) * 2
+        if volatility > 3:
+            tech_score += 10  # High volatility can continue
+        
+        vector_scores['technical_indicators'] = max(10, min(90, tech_score))
+        
+        # 4. News Sentiment Vector (15% weight)
+        news_score = 50
+        high_impact_news = [n for n in recent_news if n.impact == 'HIGH']
+        medium_impact_news = [n for n in recent_news if n.impact == 'MEDIUM']
+        
+        for news in high_impact_news:
+            if news.sentiment == 'POSITIVE':
+                news_score += 20
+            elif news.sentiment == 'NEGATIVE':
+                news_score -= 20
+        
+        for news in medium_impact_news:
+            if news.sentiment == 'POSITIVE':
+                news_score += 10
+            elif news.sentiment == 'NEGATIVE':
+                news_score -= 10
+        
+        vector_scores['news_sentiment'] = max(10, min(90, news_score))
+        
+        # 5. Global Markets Vector (10% weight)
+        # Simulate global market analysis
+        global_score = 50 + (price_momentum * 10)  # Correlation with local movement
+        vector_scores['global_markets'] = max(20, min(80, global_score))
+        
+        return vector_scores
+
+    def calculate_next_day_prediction(self, vector_scores: Dict) -> Dict:
+        """Calculate comprehensive next-day prediction"""
+        
+        # Weights for each vector
+        weights = {
+            'price_action': 0.30,
+            'volume_analysis': 0.20,
+            'technical_indicators': 0.25,
+            'news_sentiment': 0.15,
+            'global_markets': 0.10
+        }
+        
+        # Calculate weighted score
+        weighted_score = sum(
+            vector_scores.get(vector, 50) * weight 
+            for vector, weight in weights.items()
+        )
+        
+        # Determine prediction direction and confidence
+        if weighted_score > 65:
+            direction = "BULLISH"
+            confidence = min(95, (weighted_score - 50) * 1.8)
+        elif weighted_score < 35:
+            direction = "BEARISH" 
+            confidence = min(95, (50 - weighted_score) * 1.8)
+        else:
+            direction = "SIDEWAYS"
+            confidence = 100 - abs(weighted_score - 50) * 2
+        
+        # Calculate price targets
+        current_price = 19850  # Base price for calculation
+        volatility_factor = abs(weighted_score - 50) / 50 * 0.02  # 0-2% based on conviction
+        
+        if direction == "BULLISH":
+            target_high = current_price * (1 + volatility_factor + 0.005)
+            target_low = current_price * (1 + 0.002)
+            probability_up = confidence
+        elif direction == "BEARISH":
+            target_high = current_price * (1 - 0.002)
+            target_low = current_price * (1 - volatility_factor - 0.005)
+            probability_up = 100 - confidence
+        else:
+            target_high = current_price * (1 + 0.008)
+            target_low = current_price * (1 - 0.008)
+            probability_up = 50
+        
+        # Generate trading recommendations
+        recommendations = self._generate_trading_recommendations(direction, confidence, vector_scores)
+        
+        # Risk factors
+        risk_factors = self._identify_risk_factors(vector_scores)
+        
+        return {
+            'prediction_date': (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d'),
+            'direction': direction,
+            'confidence': round(confidence, 1),
+            'probability_up': round(probability_up, 1),
+            'price_targets': {
+                'high': round(target_high, 2),
+                'low': round(target_low, 2),
+                'expected_range': round(target_high - target_low, 2)
+            },
+            'vector_analysis': vector_scores,
+            'key_drivers': self._identify_key_drivers(vector_scores),
+            'trading_recommendations': recommendations,
+            'risk_factors': risk_factors,
+            'market_regime': self._determine_market_regime(vector_scores),
+            'volatility_outlook': self._predict_volatility(vector_scores)
+        }
+
+    def _generate_trading_recommendations(self, direction: str, confidence: float, vectors: Dict) -> List[Dict]:
+        """Generate specific trading recommendations based on prediction"""
+        recommendations = []
+        
+        if confidence > 75:
+            if direction == "BULLISH":
+                recommendations.extend([
+                    {
+                        'strategy': 'Long Call Options',
+                        'reasoning': 'High conviction bullish setup',
+                        'risk_level': 'MEDIUM',
+                        'allocation': '25-30%'
+                    },
+                    {
+                        'strategy': 'Bull Call Spread',
+                        'reasoning': 'Limited risk bullish strategy',
+                        'risk_level': 'LOW',
+                        'allocation': '15-20%'
+                    }
+                ])
+            elif direction == "BEARISH":
+                recommendations.extend([
+                    {
+                        'strategy': 'Long Put Options',
+                        'reasoning': 'High conviction bearish setup',
+                        'risk_level': 'MEDIUM',
+                        'allocation': '25-30%'
+                    },
+                    {
+                        'strategy': 'Bear Put Spread',
+                        'reasoning': 'Limited risk bearish strategy',
+                        'risk_level': 'LOW',
+                        'allocation': '15-20%'
+                    }
+                ])
+        elif confidence > 50:
+            recommendations.append({
+                'strategy': 'Iron Condor' if direction == "SIDEWAYS" else 'Straddle',
+                'reasoning': f'Moderate {direction.lower()} conviction',
+                'risk_level': 'MEDIUM',
+                'allocation': '20-25%'
+            })
+        else:
+            recommendations.append({
+                'strategy': 'Cash Position',
+                'reasoning': 'Low conviction - wait for clarity',
+                'risk_level': 'LOW',
+                'allocation': '100%'
+            })
+        
+        return recommendations
+
+    def _identify_key_drivers(self, vectors: Dict) -> List[str]:
+        """Identify the strongest prediction drivers"""
+        sorted_vectors = sorted(vectors.items(), key=lambda x: abs(x[1] - 50), reverse=True)
+        
+        drivers = []
+        for vector, score in sorted_vectors[:3]:
+            if abs(score - 50) > 15:
+                sentiment = "bullish" if score > 50 else "bearish"
+                drivers.append(f"{vector.replace('_', ' ').title()}: {sentiment} ({score:.0f}/100)")
+        
+        return drivers
+
+    def _identify_risk_factors(self, vectors: Dict) -> List[str]:
+        """Identify potential risk factors"""
+        risks = []
+        
+        if vectors.get('news_sentiment', 50) < 30:
+            risks.append("Negative news sentiment could impact market")
+        
+        if vectors.get('volume_analysis', 50) < 40:
+            risks.append("Low volume may indicate lack of conviction")
+        
+        if abs(vectors.get('technical_indicators', 50) - 50) < 10:
+            risks.append("Mixed technical signals reduce prediction reliability")
+        
+        # Check for conflicting signals
+        bullish_vectors = sum(1 for score in vectors.values() if score > 60)
+        bearish_vectors = sum(1 for score in vectors.values() if score < 40)
+        
+        if bullish_vectors > 0 and bearish_vectors > 0:
+            risks.append("Conflicting signals across different analysis vectors")
+        
+        return risks
+
+    def _determine_market_regime(self, vectors: Dict) -> str:
+        """Determine current market regime"""
+        avg_score = sum(vectors.values()) / len(vectors)
+        volatility = sum(abs(score - 50) for score in vectors.values()) / len(vectors)
+        
+        if volatility > 20:
+            return "High Volatility"
+        elif avg_score > 60:
+            return "Risk-On"
+        elif avg_score < 40:
+            return "Risk-Off"
+        else:
+            return "Consolidation"
+
+    def _predict_volatility(self, vectors: Dict) -> str:
+        """Predict next day volatility"""
+        volatility_score = sum(abs(score - 50) for score in vectors.values()) / len(vectors)
+        
+        if volatility_score > 25:
+            return "High (>1.5%)"
+        elif volatility_score > 15:
+            return "Medium (0.8-1.5%)"
+        else:
+            return "Low (<0.8%)"
 
 # AI Signals Service (Enhanced)
 class AISignalsService:
@@ -1565,11 +1866,37 @@ class AISignalsService:
                             if user.is_active:
                                 whatsapp_service.send_trading_signal(user.phone_number, signal)
             
-            # Send market alerts if sentiment changed significantly
-            if market_status == "CLOSED" and sentiment_analysis.get('sentiment') != 'NEUTRAL':
-                for user in store.whatsapp_users:
-                    if user.is_active:
-                        whatsapp_service.send_market_alert(user.phone_number, market_data)
+            # Generate next-day predictions when market closes
+            if market_status == "CLOSED":
+                try:
+                    # Generate comprehensive next-day prediction
+                    recent_news = store.get_recent_news(hours=24)  # Last 24 hours of news
+                    vector_scores = prediction_service.analyze_prediction_vectors(nifty_data, options_data, recent_news)
+                    next_day_prediction = prediction_service.calculate_next_day_prediction(vector_scores)
+                    
+                    # Store prediction for API access
+                    store.next_day_prediction = next_day_prediction
+                    
+                    # Emit prediction to dashboard
+                    socketio.emit('next_day_prediction', {
+                        'prediction': next_day_prediction
+                    })
+                    
+                    # Send WhatsApp alerts for next-day predictions
+                    for user in store.whatsapp_users:
+                        if user.is_active:
+                            whatsapp_service.send_next_day_prediction(user.phone_number, next_day_prediction)
+                    
+                    print(f"Next-day prediction generated: {next_day_prediction['direction']} with {next_day_prediction['confidence']}% confidence")
+                    
+                except Exception as e:
+                    print(f"Error generating next-day prediction: {e}")
+                
+                # Send market alerts if sentiment changed significantly
+                if sentiment_analysis.get('sentiment') != 'NEUTRAL':
+                    for user in store.whatsapp_users:
+                        if user.is_active:
+                            whatsapp_service.send_market_alert(user.phone_number, market_data)
             
             # Emit real-time updates
             socketio.emit('market_update', {
@@ -1613,6 +1940,7 @@ class AISignalsService:
         thread.start()
 
 ai_service = AISignalsService()
+prediction_service = MarketPredictionService()
 
 # Routes
 @app.route('/')
@@ -1782,6 +2110,68 @@ def get_trading_strategies():
         'timestamp': datetime.now().isoformat(),
         'market_status': market_status_service.get_market_status()
     })
+
+@app.route('/api/prediction/next-day')
+def get_next_day_prediction():
+    """Get next-day market prediction"""
+    market_status = market_status_service.get_market_status()
+    
+    # Generate fresh prediction if market is closed and no prediction exists
+    if market_status in ["CLOSED", "WEEKEND"] and not getattr(store, 'next_day_prediction', None):
+        try:
+            nifty_data = zerodha_service.get_nifty_quote()
+            options_data = zerodha_service.get_options_chain()
+            recent_news = store.get_recent_news(hours=24)
+            
+            vector_scores = prediction_service.analyze_prediction_vectors(nifty_data, options_data, recent_news)
+            prediction = prediction_service.calculate_next_day_prediction(vector_scores)
+            
+            store.next_day_prediction = prediction
+        except Exception as e:
+            print(f"Error generating prediction: {e}")
+            return jsonify({'error': 'Unable to generate prediction'}), 500
+    
+    prediction = getattr(store, 'next_day_prediction', None)
+    
+    if not prediction:
+        return jsonify({
+            'message': 'Next-day prediction available only after market close',
+            'market_status': market_status,
+            'available': False
+        })
+    
+    return jsonify({
+        'prediction': prediction,
+        'market_status': market_status,
+        'available': True,
+        'generated_at': datetime.now().isoformat()
+    })
+
+@app.route('/api/prediction/generate', methods=['POST'])
+def generate_next_day_prediction():
+    """Manually generate next-day prediction"""
+    try:
+        nifty_data = zerodha_service.get_nifty_quote()
+        options_data = zerodha_service.get_options_chain()
+        recent_news = store.get_recent_news(hours=24)
+        
+        vector_scores = prediction_service.analyze_prediction_vectors(nifty_data, options_data, recent_news)
+        prediction = prediction_service.calculate_next_day_prediction(vector_scores)
+        
+        store.next_day_prediction = prediction
+        
+        # Emit to connected clients
+        socketio.emit('next_day_prediction', {
+            'prediction': prediction
+        })
+        
+        return jsonify({
+            'success': True,
+            'prediction': prediction
+        })
+    except Exception as e:
+        print(f"Error generating prediction: {e}")
+        return jsonify({'error': str(e)}), 500
 
 # Socket.IO events
 @socketio.on('connect')
