@@ -319,23 +319,36 @@ class ClaudeAIService:
         """Fallback sentiment analysis when Claude AI is unavailable"""
         change = market_data.get('change', 0)
         change_percent = market_data.get('net_change', 0)
+        market_status = market_data.get('market_status', 'UNKNOWN')
         
-        if change_percent > 1:
-            sentiment = "BULLISH"
-            recommendation = "BUY_CALL"
-            reasoning = "Strong positive momentum with over 1% gain"
-        elif change_percent < -1:
-            sentiment = "BEARISH"
-            recommendation = "BUY_PUT"
-            reasoning = "Significant decline with over 1% loss"
-        elif abs(change_percent) > 0.5:
-            sentiment = "BULLISH" if change > 0 else "BEARISH"
-            recommendation = "BUY_CALL" if change > 0 else "BUY_PUT"
-            reasoning = f"Moderate {'upward' if change > 0 else 'downward'} movement"
+        # If market is closed, analyze last known data
+        if market_status != "OPEN":
+            if abs(change_percent) > 0.5:
+                sentiment = "BULLISH" if change > 0 else "BEARISH"
+                recommendation = "MONITOR"
+                reasoning = f"Market closed with {abs(change_percent):.1f}% {'gain' if change > 0 else 'loss'} - monitor for next session"
+            else:
+                sentiment = "NEUTRAL"
+                recommendation = "MONITOR"
+                reasoning = "Market closed with minimal movement - wait for next session"
         else:
-            sentiment = "NEUTRAL"
-            recommendation = "DONT_TRADE"
-            reasoning = "Low volatility, range-bound movement"
+            # Market is open - normal analysis
+            if change_percent > 1:
+                sentiment = "BULLISH"
+                recommendation = "BUY_CALL"
+                reasoning = "Strong positive momentum with over 1% gain"
+            elif change_percent < -1:
+                sentiment = "BEARISH"
+                recommendation = "BUY_PUT"
+                reasoning = "Significant decline with over 1% loss"
+            elif abs(change_percent) > 0.5:
+                sentiment = "BULLISH" if change > 0 else "BEARISH"
+                recommendation = "BUY_CALL" if change > 0 else "BUY_PUT"
+                reasoning = f"Moderate {'upward' if change > 0 else 'downward'} movement"
+            else:
+                sentiment = "NEUTRAL"
+                recommendation = "DONT_TRADE"
+                reasoning = "Low volatility, range-bound movement"
         
         return {
             "sentiment": sentiment,
@@ -473,86 +486,351 @@ class AISignalsService:
     def __init__(self):
         self.is_running = False
 
-    def calculate_technical_indicators(self, price: float, volume: int) -> Dict:
+    def calculate_technical_indicators(self, current_price: float, volume: int, market_data: Dict = None) -> Dict:
+        """Calculate comprehensive technical indicators using OHLC and other parameters"""
+        
+        # Simulate OHLC data based on current price and market movement
+        change_percent = market_data.get('net_change', 0) if market_data else 0
+        
+        # Generate realistic OHLC based on current price and volatility
+        volatility_factor = abs(change_percent) / 100 + 0.005  # Base volatility
+        
+        # Open price (previous day close approximation)
+        open_price = current_price - market_data.get('change', 0) if market_data else current_price * (1 - volatility_factor)
+        
+        # High and Low based on volatility
+        daily_range = current_price * volatility_factor
+        high_price = max(current_price, open_price) + daily_range * random.uniform(0.3, 0.7)
+        low_price = min(current_price, open_price) - daily_range * random.uniform(0.3, 0.7)
+        
+        # Ensure logical OHLC relationship
+        high_price = max(high_price, current_price, open_price)
+        low_price = min(low_price, current_price, open_price)
+        
+        # Technical Indicators
+        # RSI calculation (simplified)
+        price_momentum = (current_price - open_price) / open_price * 100 if open_price > 0 else 0
+        rsi = 50 + (price_momentum * 2)  # Base RSI around 50
+        rsi = max(10, min(90, rsi + random.uniform(-10, 10)))
+        
+        # Moving Averages
+        sma20 = current_price * (0.995 + random.uniform(0, 0.01))  # Slight variation
+        sma50 = current_price * (0.99 + random.uniform(0, 0.02))
+        ema20 = current_price * (0.998 + random.uniform(0, 0.004))
+        
+        # Bollinger Bands
+        bb_upper = sma20 * 1.02
+        bb_lower = sma20 * 0.98
+        bb_position = (current_price - bb_lower) / (bb_upper - bb_lower) * 100
+        
+        # MACD
+        macd_line = (ema20 - sma20) / current_price * 1000
+        macd_signal = macd_line * 0.8
+        macd_histogram = macd_line - macd_signal
+        
+        # Volatility indicators
+        atr = (high_price - low_price) / current_price * 100  # Average True Range %
+        volatility = abs(change_percent) * 2 + atr
+        
+        # Volume analysis
+        avg_volume = 1200000  # Average Nifty volume
+        volume_ratio = volume / avg_volume if volume > 0 else 0.5
+        
+        # Support and Resistance levels
+        support_1 = low_price
+        support_2 = low_price - (high_price - low_price) * 0.5
+        resistance_1 = high_price
+        resistance_2 = high_price + (high_price - low_price) * 0.5
+        
         return {
-            'rsi': 45 + random.uniform(0, 20),
-            'sma20': price * (0.98 + random.uniform(0, 0.04)),
-            'sma50': price * (0.96 + random.uniform(0, 0.08)),
+            'ohlc': {
+                'open': round(open_price, 2),
+                'high': round(high_price, 2),
+                'low': round(low_price, 2),
+                'close': round(current_price, 2)
+            },
+            'rsi': round(rsi, 1),
+            'sma20': round(sma20, 2),
+            'sma50': round(sma50, 2),
+            'ema20': round(ema20, 2),
+            'bollinger': {
+                'upper': round(bb_upper, 2),
+                'lower': round(bb_lower, 2),
+                'position': round(bb_position, 1)
+            },
+            'macd': {
+                'line': round(macd_line, 3),
+                'signal': round(macd_signal, 3),
+                'histogram': round(macd_histogram, 3)
+            },
             'volume': volume,
-            'volatility': 15 + random.uniform(0, 10)
+            'volume_ratio': round(volume_ratio, 2),
+            'atr': round(atr, 2),
+            'volatility': round(volatility, 1),
+            'support_resistance': {
+                'support_1': round(support_1, 2),
+                'support_2': round(support_2, 2),
+                'resistance_1': round(resistance_1, 2),
+                'resistance_2': round(resistance_2, 2)
+            }
         }
 
     def analyze_market_conditions(self, indicators: Dict) -> Dict:
+        """Enhanced market condition analysis using multiple technical factors"""
+        
+        ohlc = indicators['ohlc']
+        current_price = ohlc['close']
+        open_price = ohlc['open']
+        high_price = ohlc['high']
+        low_price = ohlc['low']
+        
+        # Price action analysis
+        body_size = abs(current_price - open_price) / open_price * 100
+        candle_range = (high_price - low_price) / low_price * 100
+        upper_wick = (high_price - max(current_price, open_price)) / max(current_price, open_price) * 100
+        lower_wick = (min(current_price, open_price) - low_price) / min(current_price, open_price) * 100
+        
+        # Trend analysis
         trend = 'sideways'
-        strength = 50
-        momentum = 50
-
-        if indicators['rsi'] > 55 and indicators['sma20'] > indicators['sma50']:
+        if indicators['sma20'] > indicators['sma50'] and current_price > indicators['sma20']:
+            if indicators['rsi'] > 50:
+                trend = 'strong_bullish'
+            else:
+                trend = 'bullish'
+        elif indicators['sma20'] < indicators['sma50'] and current_price < indicators['sma20']:
+            if indicators['rsi'] < 50:
+                trend = 'strong_bearish'
+            else:
+                trend = 'bearish'
+        elif current_price > open_price and body_size > 0.5:
             trend = 'bullish'
-            strength = 60 + random.uniform(0, 30)
-            momentum = 55 + random.uniform(0, 25)
-        elif indicators['rsi'] < 45 and indicators['sma20'] < indicators['sma50']:
+        elif current_price < open_price and body_size > 0.5:
             trend = 'bearish'
-            strength = 60 + random.uniform(0, 30)
-            momentum = 55 + random.uniform(0, 25)
+        
+        # Strength calculation
+        strength = 50
+        
+        # RSI contribution
+        if indicators['rsi'] > 70:
+            strength += 20
+        elif indicators['rsi'] > 60:
+            strength += 10
+        elif indicators['rsi'] < 30:
+            strength += 20  # Oversold bounce potential
+        elif indicators['rsi'] < 40:
+            strength += 10
+        
+        # Volume contribution
+        if indicators['volume_ratio'] > 1.5:
+            strength += 15
+        elif indicators['volume_ratio'] > 1.2:
+            strength += 10
+        
+        # MACD contribution
+        if indicators['macd']['histogram'] > 0:
+            strength += 10
+        
+        # Bollinger Band position
+        bb_pos = indicators['bollinger']['position']
+        if bb_pos > 80:  # Near upper band
+            strength += 5
+        elif bb_pos < 20:  # Near lower band
+            strength += 10  # Potential bounce
+        
+        # Volatility impact
+        if indicators['volatility'] < 15:
+            strength -= 5  # Low volatility
+        elif indicators['volatility'] > 25:
+            strength += 5  # High volatility
+        
+        strength = max(30, min(95, strength))
+        
+        # Momentum calculation
+        momentum = 50
+        
+        # Price momentum
+        price_change = (current_price - open_price) / open_price * 100
+        momentum += price_change * 10
+        
+        # MACD momentum
+        if indicators['macd']['line'] > indicators['macd']['signal']:
+            momentum += 10
         else:
-            strength = 40 + random.uniform(0, 20)
-            momentum = 40 + random.uniform(0, 20)
-
-        return {'trend': trend, 'strength': strength, 'momentum': momentum}
+            momentum -= 10
+        
+        # Volume momentum
+        if indicators['volume_ratio'] > 1.0:
+            momentum += indicators['volume_ratio'] * 5
+        
+        momentum = max(20, min(90, momentum))
+        
+        return {
+            'trend': trend,
+            'strength': round(strength, 1),
+            'momentum': round(momentum, 1),
+            'candle_pattern': {
+                'type': 'bullish' if current_price > open_price else 'bearish' if current_price < open_price else 'doji',
+                'body_size': round(body_size, 2),
+                'upper_wick': round(upper_wick, 2),
+                'lower_wick': round(lower_wick, 2)
+            }
+        }
 
     def generate_trading_signal(self, current_price: float, indicators: Dict, conditions: Dict) -> TradingSignal:
-        is_call = conditions['trend'] == 'bullish' and random.random() > 0.3
+        """Generate enhanced trading signal with OHLC-based analysis"""
+        
+        ohlc = indicators['ohlc']
+        support_resistance = indicators['support_resistance']
+        
+        # Determine signal type based on comprehensive analysis
+        bullish_signals = 0
+        bearish_signals = 0
+        
+        # Trend analysis
+        if conditions['trend'] in ['bullish', 'strong_bullish']:
+            bullish_signals += 2
+        elif conditions['trend'] in ['bearish', 'strong_bearish']:
+            bearish_signals += 2
+        
+        # Price action
+        if current_price > ohlc['open']:
+            bullish_signals += 1
+        else:
+            bearish_signals += 1
+        
+        # RSI analysis
+        if indicators['rsi'] < 35:  # Oversold
+            bullish_signals += 2
+        elif indicators['rsi'] > 65:  # Overbought
+            bearish_signals += 2
+        
+        # MACD analysis
+        if indicators['macd']['histogram'] > 0:
+            bullish_signals += 1
+        else:
+            bearish_signals += 1
+        
+        # Bollinger Band position
+        bb_pos = indicators['bollinger']['position']
+        if bb_pos < 25:  # Near lower band
+            bullish_signals += 1
+        elif bb_pos > 75:  # Near upper band
+            bearish_signals += 1
+        
+        # Volume confirmation
+        if indicators['volume_ratio'] > 1.2:
+            if current_price > ohlc['open']:
+                bullish_signals += 1
+            else:
+                bearish_signals += 1
+        
+        # Final signal determination
+        is_call = bullish_signals > bearish_signals
         signal_type = 'CALL' if is_call else 'PUT'
         
-        # Generate strike price
+        # Generate strike price based on support/resistance
         base_strike = round(current_price / 50) * 50
-        if is_call:
-            strike_price = base_strike + random.choice([0, 50, 100])
-        else:
-            strike_price = base_strike - random.choice([0, 50, 100])
-
-        # Calculate confidence
-        confidence = 60
-        if conditions['strength'] > 70:
-            confidence += 15
-        if conditions['momentum'] > 70:
-            confidence += 10
-        if indicators['volume'] > 1000000:
-            confidence += 5
-        if indicators['volatility'] < 20:
-            confidence += 10
         
-        confidence += random.randint(-10, 20)
-        confidence = max(60, min(98, confidence))
-
-        # Generate prices
-        base_option_price = 30 + random.uniform(0, 40)
-        target_price = base_option_price * (1.5 + random.uniform(0, 0.8))
-        stop_loss = base_option_price * (0.4 + random.uniform(0, 0.3))
-
-        # Generate reasoning
-        reasons = []
-        if signal_type == 'CALL':
-            if conditions['trend'] == 'bullish':
-                reasons.append('Strong bullish momentum detected')
-            if indicators['rsi'] < 50:
-                reasons.append('RSI oversold recovery pattern')
-            if indicators['sma20'] > indicators['sma50']:
-                reasons.append('Short-term MA above long-term MA')
+        if is_call:
+            # For CALL, choose strikes near current price or slight OTM
+            if current_price > support_resistance['resistance_1'] * 0.995:
+                strike_price = base_strike + 50  # OTM
+            else:
+                strike_price = base_strike  # ATM
         else:
-            if conditions['trend'] == 'bearish':
-                reasons.append('Bearish trend continuation expected')
+            # For PUT, choose strikes near current price or slight OTM
+            if current_price < support_resistance['support_1'] * 1.005:
+                strike_price = base_strike - 50  # OTM
+            else:
+                strike_price = base_strike  # ATM
+        
+        # Calculate confidence based on signal strength
+        confidence = 60
+        signal_strength = abs(bullish_signals - bearish_signals)
+        confidence += signal_strength * 8
+        
+        # Additional confidence factors
+        if conditions['strength'] > 75:
+            confidence += 10
+        if conditions['momentum'] > 70:
+            confidence += 8
+        if indicators['volume_ratio'] > 1.5:
+            confidence += 5
+        if abs(indicators['macd']['histogram']) > 0.5:
+            confidence += 5
+        
+        confidence = max(60, min(95, confidence))
+        
+        # Calculate option premium estimate
+        distance_from_spot = abs(strike_price - current_price)
+        time_value = 15 + (indicators['volatility'] * 2)  # Base time value
+        intrinsic_value = max(0, current_price - strike_price) if is_call else max(0, strike_price - current_price)
+        base_premium = intrinsic_value + time_value + (distance_from_spot * 0.1)
+        
+        # Adjust premium based on volatility and time
+        volatility_premium = indicators['volatility'] * 1.5
+        base_premium += volatility_premium
+        
+        # Target and Stop Loss calculation using technical levels
+        if is_call:
+            # Target based on resistance levels and volatility
+            next_resistance = support_resistance['resistance_1']
+            price_target = max(next_resistance, current_price + (indicators['atr'] * current_price / 100))
+            option_target_multiplier = 1.8 + (indicators['volatility'] / 50)
+            
+            # Stop loss based on support
+            support_level = support_resistance['support_1']
+            stop_multiplier = 0.3 + (indicators['volatility'] / 100)
+            
+        else:
+            # Target based on support levels
+            next_support = support_resistance['support_1']
+            price_target = min(next_support, current_price - (indicators['atr'] * current_price / 100))
+            option_target_multiplier = 1.8 + (indicators['volatility'] / 50)
+            
+            # Stop loss based on resistance
+            resistance_level = support_resistance['resistance_1']
+            stop_multiplier = 0.3 + (indicators['volatility'] / 100)
+        
+        target_price = base_premium * option_target_multiplier
+        stop_loss = base_premium * stop_multiplier
+        
+        # Generate detailed reasoning
+        reasons = []
+        
+        # Technical reasons
+        if signal_type == 'CALL':
+            if indicators['rsi'] < 40:
+                reasons.append(f"RSI oversold at {indicators['rsi']:.1f}")
+            if current_price > indicators['sma20']:
+                reasons.append("Price above SMA20")
+            if indicators['macd']['histogram'] > 0:
+                reasons.append("MACD bullish crossover")
+            if bb_pos < 30:
+                reasons.append("Near Bollinger lower band")
+        else:
             if indicators['rsi'] > 60:
-                reasons.append('RSI overbought, correction likely')
-            if indicators['volatility'] > 25:
-                reasons.append('High volatility favoring downward move')
-
-        if confidence > 90:
-            reasons.append('Multiple confirmations align')
-
-        reasoning = ', '.join(reasons[:2]) + '. Trade with proper risk management.'
-
+                reasons.append(f"RSI overbought at {indicators['rsi']:.1f}")
+            if current_price < indicators['sma20']:
+                reasons.append("Price below SMA20")
+            if indicators['macd']['histogram'] < 0:
+                reasons.append("MACD bearish momentum")
+            if bb_pos > 70:
+                reasons.append("Near Bollinger upper band")
+        
+        # Volume and volatility
+        if indicators['volume_ratio'] > 1.3:
+            reasons.append("High volume confirmation")
+        if indicators['volatility'] > 20:
+            reasons.append("Elevated volatility")
+        
+        # OHLC pattern
+        candle = conditions['candle_pattern']
+        if candle['body_size'] > 1:
+            reasons.append(f"Strong {candle['type']} candle")
+        
+        reasoning = '. '.join(reasons[:3]) + f". ATR: {indicators['atr']:.1f}%, Vol: {indicators['volatility']:.1f}%"
+        
         return TradingSignal(
             id=0,  # Will be set by store
             type=signal_type,
@@ -590,15 +868,15 @@ class AISignalsService:
                 last_updated=datetime.now().isoformat(),
                 market_status=market_status,
                 sentiment=sentiment_analysis.get('sentiment', 'NEUTRAL'),
-                flash_message=self._format_flash_message(sentiment_analysis.get('recommendation', 'DONT_TRADE'))
+                flash_message=self._format_flash_message(sentiment_analysis.get('recommendation', 'DONT_TRADE'), market_status)
             )
             store.market_data['NIFTY50'] = market_data
             
             # Generate signals only if market is open or near close
             new_signals = []
-            if market_status in ["OPEN", "PRE_MARKET"]:
-                # Generate AI signals
-                indicators = self.calculate_technical_indicators(current_price, volume)
+            if market_status in ["OPEN"]:  # Only generate signals when market is actually open
+                # Generate AI signals with enhanced technical analysis
+                indicators = self.calculate_technical_indicators(current_price, volume, nifty_data)
                 conditions = self.analyze_market_conditions(indicators)
                 
                 # Generate 1-2 signals
@@ -633,8 +911,11 @@ class AISignalsService:
         except Exception as e:
             print(f"Error generating signals: {e}")
 
-    def _format_flash_message(self, recommendation: str) -> str:
+    def _format_flash_message(self, recommendation: str, market_status: str) -> str:
         """Format trading recommendation as flash message"""
+        if market_status != "OPEN":
+            return f"📴 MARKET NOT LIVE - {market_status}"
+        
         messages = {
             "BUY_CALL": "🚀 BUY CALL - Bullish momentum detected!",
             "BUY_PUT": "📉 BUY PUT - Bearish pressure building!",
