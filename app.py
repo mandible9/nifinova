@@ -33,7 +33,23 @@ class TradingSignal:
     reasoning: str
     expiry_date: str
     created_at: str
+    strategy_type: str = "INTRADAY"  # POSITIONAL, SCALPING, BTST, INTRADAY
+    strategy_reasoning: str = ""
+    holding_period: str = ""
+    risk_level: str = "MEDIUM"
     whatsapp_sent: bool = False
+
+@dataclass
+class TradingStrategy:
+    strategy_type: str  # POSITIONAL, SCALPING, BTST, INTRADAY
+    recommended: bool
+    confidence: int
+    reasoning: str
+    target_duration: str
+    risk_level: str
+    capital_allocation: str
+    entry_conditions: List[str]
+    exit_conditions: List[str]
 
 @dataclass
 class WhatsAppUser:
@@ -89,6 +105,7 @@ class DataStore:
         self.next_whatsapp_id = 1
         self.next_news_id = 1
         self.last_market_data = None
+        self.trading_strategies: List[TradingStrategy] = []
 
     def add_whatsapp_user(self, phone_number: str) -> WhatsAppUser:
         user = WhatsAppUser(
@@ -741,18 +758,36 @@ class WhatsAppService:
         self.api_url = 'https://graph.facebook.com/v17.0'
 
     def send_trading_signal(self, phone_number: str, signal: TradingSignal):
+        strategy_emoji = {
+            'SCALPING': '⚡',
+            'INTRADAY': '📈',
+            'BTST': '🌙',
+            'POSITIONAL': '📊'
+        }.get(signal.strategy_type, '📈')
+        
+        risk_emoji = {
+            'LOW': '🟢',
+            'MEDIUM': '🟡',
+            'HIGH': '🔴'
+        }.get(signal.risk_level, '🟡')
+        
         message = f"""🚨 NIFINOVA AI SIGNAL 🚨
 
-📈 {signal.type} Signal Alert
-🎯 Strike: {signal.strike_price}
+{strategy_emoji} {signal.strategy_type} {signal.type} Signal
+🎯 Strike: ₹{signal.strike_price}
 💪 Confidence: {signal.confidence}%
+{risk_emoji} Risk: {signal.risk_level}
 
 📊 Trade Details:
 • Target: ₹{signal.target_price}
 • Stop Loss: ₹{signal.stop_loss}
+• Duration: {signal.holding_period}
 
-💡 AI Analysis:
+💡 Technical Analysis:
 {signal.reasoning}
+
+🎯 Strategy Logic:
+{signal.strategy_reasoning}
 
 ⚠️ Risk Disclaimer: Trading involves risk. Please trade responsibly.
 
@@ -1034,7 +1069,228 @@ class AISignalsService:
             }
         }
 
-    def generate_trading_signal(self, current_price: float, indicators: Dict, conditions: Dict) -> TradingSignal:
+    def analyze_trading_strategies(self, indicators: Dict, conditions: Dict, market_data: Dict) -> List[TradingStrategy]:
+        """Analyze and recommend trading strategies based on market conditions"""
+        
+        strategies = []
+        current_price = indicators['ohlc']['close']
+        volatility = indicators['volatility']
+        trend = conditions['trend']
+        strength = conditions['strength']
+        momentum = conditions['momentum']
+        volume_ratio = indicators['volume_ratio']
+        rsi = indicators['rsi']
+        market_status = market_data.get('market_status', 'UNKNOWN')
+        
+        # SCALPING Strategy Analysis
+        scalping_score = 0
+        scalping_reasons = []
+        
+        # High volatility favors scalping
+        if volatility > 20:
+            scalping_score += 25
+            scalping_reasons.append(f"High volatility ({volatility:.1f}%)")
+        
+        # High volume supports scalping
+        if volume_ratio > 1.3:
+            scalping_score += 20
+            scalping_reasons.append(f"Above average volume ({volume_ratio:.1f}x)")
+        
+        # Strong momentum for quick moves
+        if momentum > 65 or momentum < 35:
+            scalping_score += 15
+            scalping_reasons.append("Strong directional momentum")
+        
+        # RSI extremes for quick reversals
+        if rsi > 70 or rsi < 30:
+            scalping_score += 10
+            scalping_reasons.append(f"RSI extreme at {rsi:.1f}")
+        
+        # Market must be open for scalping
+        if market_status != "OPEN":
+            scalping_score = 0
+            scalping_reasons = ["Market not live"]
+        
+        strategies.append(TradingStrategy(
+            strategy_type="SCALPING",
+            recommended=scalping_score >= 50,
+            confidence=min(scalping_score, 95),
+            reasoning=". ".join(scalping_reasons[:3]) if scalping_reasons else "Low volatility environment",
+            target_duration="1-5 minutes",
+            risk_level="HIGH" if volatility > 25 else "MEDIUM",
+            capital_allocation="10-20% per trade",
+            entry_conditions=[
+                "Strong momentum breakout",
+                "High volume confirmation", 
+                "Clear support/resistance levels"
+            ],
+            exit_conditions=[
+                "Quick 0.5-1% profit target",
+                "Tight 0.3% stop loss",
+                "Momentum reversal signals"
+            ]
+        ))
+        
+        # INTRADAY Strategy Analysis
+        intraday_score = 0
+        intraday_reasons = []
+        
+        # Good for trending markets
+        if trend in ['bullish', 'bearish', 'strong_bullish', 'strong_bearish']:
+            intraday_score += 20
+            intraday_reasons.append(f"Clear {trend} trend")
+        
+        # Moderate volatility ideal
+        if 10 <= volatility <= 25:
+            intraday_score += 15
+            intraday_reasons.append("Optimal volatility range")
+        
+        # Decent volume
+        if volume_ratio > 0.8:
+            intraday_score += 15
+            intraday_reasons.append("Adequate volume")
+        
+        # Market strength
+        if strength > 60:
+            intraday_score += 15
+            intraday_reasons.append("Strong market conditions")
+        
+        # Technical setup
+        if 40 <= rsi <= 70:
+            intraday_score += 10
+            intraday_reasons.append("Healthy RSI levels")
+        
+        # Always possible if market is open
+        if market_status == "OPEN":
+            intraday_score += 10
+        
+        strategies.append(TradingStrategy(
+            strategy_type="INTRADAY",
+            recommended=intraday_score >= 45,
+            confidence=min(intraday_score, 90),
+            reasoning=". ".join(intraday_reasons[:3]) if intraday_reasons else "Suitable for day trading",
+            target_duration="Few hours",
+            risk_level="MEDIUM",
+            capital_allocation="20-30% per trade",
+            entry_conditions=[
+                "Trend confirmation",
+                "Volume support",
+                "Technical breakouts"
+            ],
+            exit_conditions=[
+                "1-3% profit targets",
+                "End of day exit",
+                "Trend reversal"
+            ]
+        ))
+        
+        # BTST (Buy Today Sell Tomorrow) Strategy Analysis
+        btst_score = 0
+        btst_reasons = []
+        
+        # Late session strength for BTST
+        current_hour = datetime.now().hour
+        if 13 <= current_hour <= 15 and market_status == "OPEN":  # Last 2 hours
+            if trend in ['bullish', 'strong_bullish'] and momentum > 60:
+                btst_score += 25
+                btst_reasons.append("Late session bullish momentum")
+        
+        # Strong closing above key levels
+        if indicators['bollinger']['position'] > 60:
+            btst_score += 15
+            btst_reasons.append("Closing near upper Bollinger band")
+        
+        # Momentum continuation
+        if indicators['macd']['histogram'] > 0 and momentum > 55:
+            btst_score += 20
+            btst_reasons.append("Positive MACD momentum")
+        
+        # Volume confirmation
+        if volume_ratio > 1.1:
+            btst_score += 10
+            btst_reasons.append("Volume supports move")
+        
+        # Market sentiment
+        if strength > 65:
+            btst_score += 10
+            btst_reasons.append("Strong market sentiment")
+        
+        strategies.append(TradingStrategy(
+            strategy_type="BTST",
+            recommended=btst_score >= 40,
+            confidence=min(btst_score, 85),
+            reasoning=". ".join(btst_reasons[:3]) if btst_reasons else "Limited setup for BTST",
+            target_duration="1 day",
+            risk_level="MEDIUM",
+            capital_allocation="15-25% per trade",
+            entry_conditions=[
+                "Late session strength",
+                "Technical breakout",
+                "Momentum continuation"
+            ],
+            exit_conditions=[
+                "Next day gap up profit",
+                "2-4% target",
+                "Morning weakness exit"
+            ]
+        ))
+        
+        # POSITIONAL Strategy Analysis
+        positional_score = 0
+        positional_reasons = []
+        
+        # Strong sustained trends
+        if trend in ['strong_bullish', 'strong_bearish']:
+            positional_score += 30
+            positional_reasons.append(f"Strong {trend.replace('_', ' ')} trend")
+        
+        # Technical setup alignment
+        if indicators['sma20'] > indicators['sma50']:
+            if trend in ['bullish', 'strong_bullish']:
+                positional_score += 20
+                positional_reasons.append("Moving averages aligned")
+        
+        # RSI not in extreme zones
+        if 35 <= rsi <= 65:
+            positional_score += 15
+            positional_reasons.append("RSI in sustainable range")
+        
+        # Momentum sustainability
+        if 55 <= momentum <= 80:
+            positional_score += 15
+            positional_reasons.append("Sustainable momentum")
+        
+        # Market structure
+        if strength > 70:
+            positional_score += 10
+            positional_reasons.append("Strong market structure")
+        
+        strategies.append(TradingStrategy(
+            strategy_type="POSITIONAL",
+            recommended=positional_score >= 50,
+            confidence=min(positional_score, 88),
+            reasoning=". ".join(positional_reasons[:3]) if positional_reasons else "No clear positional setup",
+            target_duration="5-15 days",
+            risk_level="LOW" if strength > 75 else "MEDIUM",
+            capital_allocation="30-50% per trade",
+            entry_conditions=[
+                "Strong trend confirmation",
+                "Multiple timeframe alignment",
+                "Support at key levels"
+            ],
+            exit_conditions=[
+                "5-15% profit targets",
+                "Trend reversal signals",
+                "Key resistance breaks"
+            ]
+        ))
+        
+        # Sort strategies by confidence
+        strategies.sort(key=lambda x: x.confidence, reverse=True)
+        
+        return strategies
+
+    def generate_trading_signal(self, current_price: float, indicators: Dict, conditions: Dict, strategies: List[TradingStrategy]) -> TradingSignal:
         """Generate enhanced trading signal with OHLC-based analysis"""
         
         ohlc = indicators['ohlc']
@@ -1189,6 +1445,33 @@ class AISignalsService:
         
         reasoning = '. '.join(reasons[:3]) + f". ATR: {indicators['atr']:.1f}%, Vol: {indicators['volatility']:.1f}%"
         
+        # Determine best strategy for this signal
+        recommended_strategies = [s for s in strategies if s.recommended]
+        best_strategy = recommended_strategies[0] if recommended_strategies else strategies[0]
+        
+        # Adjust signal parameters based on strategy
+        strategy_type = best_strategy.strategy_type
+        risk_level = best_strategy.risk_level
+        
+        # Strategy-specific adjustments
+        if strategy_type == "SCALPING":
+            target_price *= 0.6  # Smaller targets for scalping
+            stop_loss *= 0.5    # Tighter stops
+            strategy_reasoning = f"Best for {strategy_type}: {best_strategy.reasoning}"
+            holding_period = "1-5 minutes"
+        elif strategy_type == "BTST":
+            target_price *= 1.5  # Larger targets for overnight holds
+            strategy_reasoning = f"BTST Setup: {best_strategy.reasoning}"
+            holding_period = "1 day"
+        elif strategy_type == "POSITIONAL":
+            target_price *= 2.0  # Much larger targets
+            stop_loss *= 1.5    # Wider stops
+            strategy_reasoning = f"Positional Trade: {best_strategy.reasoning}"
+            holding_period = "5-15 days"
+        else:  # INTRADAY
+            strategy_reasoning = f"Intraday Setup: {best_strategy.reasoning}"
+            holding_period = "Few hours"
+        
         return TradingSignal(
             id=0,  # Will be set by store
             type=signal_type,
@@ -1198,7 +1481,11 @@ class AISignalsService:
             confidence=confidence,
             reasoning=reasoning,
             expiry_date=zerodha_service.get_next_thursday().strftime('%Y-%m-%d'),
-            created_at=datetime.now().isoformat()
+            created_at=datetime.now().isoformat(),
+            strategy_type=strategy_type,
+            strategy_reasoning=strategy_reasoning,
+            holding_period=holding_period,
+            risk_level=risk_level
         )
 
     def generate_signals(self):
@@ -1259,12 +1546,16 @@ class AISignalsService:
                 # Generate AI signals with enhanced technical analysis
                 indicators = self.calculate_technical_indicators(current_price, volume, nifty_data)
                 conditions = self.analyze_market_conditions(indicators)
+                strategies = self.analyze_trading_strategies(indicators, conditions, nifty_data)
+                
+                # Store strategies for API access
+                store.trading_strategies = strategies
                 
                 # Generate 1-2 signals
                 num_signals = random.randint(1, 2)
                 
                 for _ in range(num_signals):
-                    signal = self.generate_trading_signal(current_price, indicators, conditions)
+                    signal = self.generate_trading_signal(current_price, indicators, conditions, strategies)
                     stored_signal = store.add_trading_signal(signal)
                     new_signals.append(stored_signal)
                     
@@ -1463,6 +1754,33 @@ def check_news():
     return jsonify({
         'new_flashes': len(new_flashes),
         'flashes': [asdict(news) for news in new_flashes]
+    })
+
+@app.route('/api/trading/strategies')
+def get_trading_strategies():
+    """Get current trading strategy recommendations"""
+    strategies = getattr(store, 'trading_strategies', [])
+    
+    if not strategies:
+        # Generate fresh strategy analysis
+        try:
+            nifty_data = zerodha_service.get_nifty_quote()
+            current_price = nifty_data['last_price']
+            volume = nifty_data['volume']
+            
+            indicators = ai_service.calculate_technical_indicators(current_price, volume, nifty_data)
+            conditions = ai_service.analyze_market_conditions(indicators)
+            strategies = ai_service.analyze_trading_strategies(indicators, conditions, nifty_data)
+            
+            store.trading_strategies = strategies
+        except Exception as e:
+            print(f"Error generating strategies: {e}")
+            strategies = []
+    
+    return jsonify({
+        'strategies': [asdict(strategy) for strategy in strategies],
+        'timestamp': datetime.now().isoformat(),
+        'market_status': market_status_service.get_market_status()
     })
 
 # Socket.IO events
