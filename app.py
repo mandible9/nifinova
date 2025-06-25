@@ -817,7 +817,7 @@ class WhatsAppService:
 
     def send_news_flash(self, phone_number: str, news: NewsFlash):
         """Send breaking news flash via WhatsApp"""
-        impact_emoji = "🚨" ifnews.impact == "HIGH" else "⚠️" if news.impact == "MEDIUM" else "ℹ️"
+        impact_emoji = "🚨" if news.impact == "HIGH" else "⚠️" if news.impact == "MEDIUM" else "ℹ️"
         sentiment_emoji = "📈" if news.sentiment == "POSITIVE" else "📉" if news.sentiment == "NEGATIVE" else "📊"
 
         category_emoji = {
