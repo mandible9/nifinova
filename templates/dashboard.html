@@ -1,4 +1,3 @@
-
 {% extends "base.html" %}
 
 {% block title %}Trading Dashboard{% endblock %}
@@ -75,14 +74,14 @@
     </div>
 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
+
         <!-- Top Section: Market Overview -->
         <div class="mb-8">
             <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
                 <span class="mr-3">📊</span>
                 Market Overview
             </h2>
-            
+
             <!-- Market Stats Cards -->
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
                 <!-- Nifty 50 Card -->
@@ -166,10 +165,10 @@
 
         <!-- Main Content Grid -->
         <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
-            
+
             <!-- Left Column: Trading Signals & Strategies -->
             <div class="xl:col-span-2 space-y-8">
-                
+
                 <!-- AI Trading Signals -->
                 <div class="bg-white rounded-2xl shadow-lg border border-gray-200">
                     <div class="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50 rounded-t-2xl">
@@ -252,7 +251,7 @@
 
             <!-- Right Column: Options Chain, News & WhatsApp -->
             <div class="space-y-8">
-                
+
                 <!-- Options Chain -->
                 <div class="bg-white rounded-2xl shadow-lg border border-gray-200">
                     <div class="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-t-2xl">
@@ -1108,14 +1107,148 @@
         });
     }
 
-    // Initial load
-    loadMarketOverview();
-    loadSignals();
-    loadOptionsChain();
-    loadWhatsAppUsers();
-    loadNewsFlash();
-    loadTradingStrategies();
-    loadNextDayPrediction();
+function updatePrediction(prediction) {
+            const predictionCard = document.getElementById('prediction-card');
+            if (predictionCard && prediction) {
+                const directionColor = prediction.direction === 'UP' ? 'text-green-600' : 
+                                     prediction.direction === 'DOWN' ? 'text-red-600' : 'text-yellow-600';
+
+                predictionCard.innerHTML = `
+                    <div class="p-4">
+                        <h3 class="font-bold text-lg mb-2">Next Day Prediction</h3>
+                        <div class="space-y-2">
+                            <p><span class="font-semibold">Direction:</span> <span class="${directionColor}">${prediction.direction}</span></p>
+                            <p><span class="font-semibold">Confidence:</span> ${prediction.confidence}%</p>
+                            <p><span class="font-semibold">Expected Range:</span> ${prediction.price_targets.low} - ${prediction.price_targets.high}</p>
+                            <p><span class="font-semibold">Market Regime:</span> ${prediction.market_regime}</p>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function updateOptionsChain(optionsData) {
+            const optionsTable = document.getElementById('options-table');
+            if (optionsTable && optionsData && optionsData.length > 0) {
+                const tbody = optionsTable.querySelector('tbody');
+                tbody.innerHTML = '';
+
+                optionsData.slice(0, 10).forEach(option => {
+                    const row = tbody.insertRow();
+                    row.innerHTML = `
+                        <td class="px-4 py-2">${option.strike}</td>
+                        <td class="px-4 py-2 text-green-600">₹${option.call_ltp || 'N/A'}</td>
+                        <td class="px-4 py-2">${option.call_volume || 0}</td>
+                        <td class="px-4 py-2 text-red-600">₹${option.put_ltp || 'N/A'}</td>
+                        <td class="px-4 py-2">${option.put_volume || 0}</td>
+                    `;
+                });
+            }
+        }
+
+        // News flash functionality
+        function checkNews() {
+            fetch('/api/news/check')
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.length > 0) {
+                        showNewsFlash(data[0]);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking news:', error);
+                });
+        }
+
+        function showNewsFlash(news) {
+            const flashDiv = document.getElementById('newsFlash');
+            if (flashDiv && news) {
+                flashDiv.innerHTML = `
+                    <div class="bg-red-100 border-l-4 border-red-500 p-4 mb-4">
+                        <div class="flex items-center">
+                            <span class="text-2xl mr-2">${news.impact === 'HIGH' ? '🚨' : '⚠️'}</span>
+                            <div>
+                                <h3 class="font-bold text-red-800">${news.headline}</h3>
+                                <p class="text-red-600">${news.summary}</p>
+                                <p class="text-sm text-red-500">Impact: ${news.impact} | ${new Date(news.timestamp).toLocaleTimeString()}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                flashDiv.style.display = 'block';
+
+                // Auto-hide after 10 seconds
+                setTimeout(() => {
+                    flashDiv.style.display = 'none';
+                }, 10000);
+            }
+        }
+
+        // Auto-refresh news every 30 seconds
+        setInterval(checkNews, 30000);
+
+// Refresh functionality
+        function refreshData() {
+            loadMarketData();
+            loadSignals();
+            loadTradingStrategies();
+            loadNewsFlash();
+            loadOptionsChain();
+            loadNextDayPrediction();
+            checkNews();
+        }
+// Load functions
+        function loadMarketData() {
+            fetch('/api/market/overview')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('Error loading data:', data.error);
+                        return;
+                    }
+                    updateNiftyData(data.nifty50);
+                })
+                .catch(error => {
+                    console.error('Error loading data:', error);
+                });
+        }
+
+        function loadPrediction() {
+            fetch('/api/prediction/next-day')
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.prediction) {
+                        updatePrediction(data.prediction);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading prediction:', error);
+                });
+        }
+
+        function loadOptionsChain() {
+            fetch('/api/options-chain')
+                .then(response => response.json())
+                .then(data => {
+                    updateOptionsChain(data.options);
+                })
+                .catch(error => {
+                    console.error('Error loading options chain:', error);
+                });
+        }
+        
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadMarketOverview();
+            loadSignals();
+            loadOptionsChain();
+            loadWhatsAppUsers();
+            loadNewsFlash();
+            loadTradingStrategies();
+            loadNextDayPrediction();
+
+        });
 
     // Refresh data periodically
     setInterval(loadMarketOverview, 30000);
