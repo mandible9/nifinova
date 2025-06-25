@@ -262,16 +262,24 @@ class NSEDataService:
         }
 
     def get_options_chain_data(self) -> List[OptionsData]:
-        """Fetch options chain from NSE"""
+        """Fetch options chain from NSE - only real data"""
+        market_status = market_status_service.get_market_status()
+        
+        # If market is closed, return stored real data if available
+        if market_status != "OPEN":
+            if store.options_chain:
+                print(f"Using stored options chain data (Market: {market_status})")
+                return store.options_chain
+            else:
+                # Return empty list when no real data is available and market is closed
+                print(f"No options data available - Market is {market_status}")
+                return []
+        
+        # Market is open - try to fetch live data
         try:
-            if market_status_service.get_market_status() != "OPEN":
-                # Return stored options chain when market is closed
-                if store.options_chain:
-                    return store.options_chain
-            
-            # Try to fetch live options data
+            # Try NSE API first
             url = f"{self.base_url}/option-chain-indices?symbol=NIFTY"
-            response = requests.get(url, headers=self.headers, timeout=15)
+            response = self.session.get(url, timeout=15)
             
             if response.status_code == 200:
                 data = response.json()
@@ -283,43 +291,42 @@ class NSEDataService:
                     ce_data = record.get('CE', {})
                     pe_data = record.get('PE', {})
                     
-                    options.append(OptionsData(
-                        strike_price=float(strike),
-                        call_ltp=float(ce_data.get('lastPrice', 0)),
-                        call_volume=int(ce_data.get('totalTradedVolume', 0)),
-                        put_ltp=float(pe_data.get('lastPrice', 0)),
-                        put_volume=int(pe_data.get('totalTradedVolume', 0)),
-                        expiry_date=ce_data.get('expiryDate', '')
-                    ))
+                    if strike > 0:  # Only include valid strikes
+                        options.append(OptionsData(
+                            strike_price=float(strike),
+                            call_ltp=float(ce_data.get('lastPrice', 0)),
+                            call_volume=int(ce_data.get('totalTradedVolume', 0)),
+                            put_ltp=float(pe_data.get('lastPrice', 0)),
+                            put_volume=int(pe_data.get('totalTradedVolume', 0)),
+                            expiry_date=ce_data.get('expiryDate', '')
+                        ))
                 
-                return options
+                if options:
+                    # Store real data for later use
+                    store.options_chain = options
+                    print(f"Fetched real options chain data: {len(options)} strikes")
+                    return options
                 
         except Exception as e:
-            print(f"Options chain API error: {e}")
+            print(f"NSE options chain API error: {e}")
         
-        # Return stored data or generate mock data
+        # Try alternative Yahoo Finance options data
+        try:
+            # This is a placeholder - Yahoo Finance doesn't provide detailed options chain
+            # But we can try to get some basic options info
+            pass
+        except Exception as e:
+            print(f"Alternative options API error: {e}")
+        
+        # Return stored real data if available, otherwise empty
         if store.options_chain:
+            print("Using previously stored real options data")
             return store.options_chain
         
-        return self._generate_mock_options()
+        print("No real options data available")
+        return []
 
-    def _generate_mock_options(self) -> List[OptionsData]:
-        """Generate mock options data when real data unavailable"""
-        base_price = store.last_market_data.get('last_price', 19845) if store.last_market_data else 19845
-        strikes = [base_price - 100, base_price - 50, base_price, base_price + 50, base_price + 100]
-        
-        options = []
-        for strike in strikes:
-            options.append(OptionsData(
-                strike_price=strike,
-                call_ltp=max(5, 100 - abs(strike - base_price) * 2),
-                call_volume=0,
-                put_ltp=max(5, 20 + abs(strike - base_price) * 1.5),
-                put_volume=0,
-                expiry_date="2025-01-02"
-            ))
-        
-        return options
+    
 
 nse_service = NSEDataService()
 
@@ -1107,9 +1114,15 @@ def remove_whatsapp_user(phone_number):
 
 @app.route('/api/options-chain')
 def options_chain():
-    if not store.options_chain:
-        store.options_chain = zerodha_service.get_options_chain()
-    return jsonify([asdict(o) for o in store.options_chain])
+    options_data = zerodha_service.get_options_chain_data()
+    market_status = market_status_service.get_market_status()
+    
+    return jsonify({
+        'options': [asdict(o) for o in options_data],
+        'market_status': market_status,
+        'data_available': len(options_data) > 0,
+        'message': 'Real options data' if options_data else f'No options data - Market is {market_status}'
+    })
 
 @app.route('/api/market/status')
 def market_status():
