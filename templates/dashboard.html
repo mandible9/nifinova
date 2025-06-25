@@ -1,26 +1,42 @@
+
 {% extends "base.html" %}
 
 {% block title %}Trading Dashboard{% endblock %}
 
 {% block content %}
-<div class="min-h-screen bg-gray-50">
-    <!-- Header -->
-    <header class="bg-white shadow-sm border-b">
+<div class="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
+    <!-- Enhanced Header -->
+    <header class="bg-white shadow-lg border-b border-gray-200">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center py-4">
-                <div class="flex items-center">
-                    <h1 class="text-2xl font-bold text-gray-900">NIFINOVA AI</h1>
-                    <span class="ml-3 px-3 py-1 text-sm font-medium rounded-full bg-blue-100 text-blue-800">Live Dashboard</span>
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center">
+                        <div class="w-10 h-10 bg-gradient-to-br from-blue-500 via-purple-600 to-indigo-700 rounded-lg flex items-center justify-center shadow-lg">
+                            <span class="text-white font-bold text-lg">N</span>
+                        </div>
+                        <div class="ml-3">
+                            <h1 class="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">NIFINOVA AI</h1>
+                            <p class="text-xs text-gray-500">by PKR SOLUTION</p>
+                        </div>
+                    </div>
+                    <span class="ml-3 px-3 py-1 text-sm font-medium rounded-full bg-green-100 text-green-800 animate-pulse">
+                        🟢 Live Dashboard
+                    </span>
                 </div>
                 <div class="flex items-center space-x-4">
-                    <div id="marketStatus" class="px-3 py-1 rounded-full text-sm font-medium">
+                    <div id="marketStatus" class="px-4 py-2 rounded-full text-sm font-medium border-2 transition-all duration-300">
                         <span class="flex items-center">
-                            <span class="w-2 h-2 rounded-full mr-2" id="statusDot"></span>
+                            <span class="w-3 h-3 rounded-full mr-2 animate-pulse" id="statusDot"></span>
                             <span id="statusText">Loading...</span>
                         </span>
                     </div>
-                    <span class="text-gray-600">Welcome, {{ session.username }}</span>
-                    <button onclick="logout()" class="text-red-600 hover:text-red-800">Logout</button>
+                    <div class="text-right">
+                        <span class="text-gray-600 text-sm">Welcome back,</span>
+                        <div class="font-semibold text-gray-800">{{ session.username }}</div>
+                    </div>
+                    <button onclick="logout()" class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors duration-200 shadow-md">
+                        Logout
+                    </button>
                 </div>
             </div>
         </div>
@@ -28,225 +44,284 @@
 
     <!-- Flash Message Banner -->
     <div id="flashBanner" class="hidden">
-        <div class="bg-gradient-to-r from-yellow-400 to-orange-500 text-white py-3 px-4">
+        <div class="bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 text-white py-4 px-4 animate-pulse">
             <div class="max-w-7xl mx-auto flex items-center justify-center">
+                <span class="text-lg font-bold animate-bounce mr-2">⚡</span>
                 <span class="text-lg font-bold" id="flashMessage">Loading...</span>
             </div>
         </div>
     </div>
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <!-- Market Overview Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-gray-600">Nifty 50</p>
-                        <p class="text-2xl font-bold text-gray-900" id="niftyPrice">₹0.00</p>
-                        <p class="text-sm" id="niftyChange">+0.00 (0.00%)</p>
+    <!-- News Flash Alert Bar -->
+    <div id="newsFlashBar" class="hidden">
+        <div class="bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500 text-white p-4 shadow-lg">
+            <div class="max-w-7xl mx-auto flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="animate-bounce">
+                        <span class="text-3xl">🚨</span>
                     </div>
-                    <div class="text-right">
-                        <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-                            </svg>
+                    <div>
+                        <h4 class="font-bold text-xl">BREAKING NEWS</h4>
+                        <p id="newsFlashText" class="text-sm opacity-90"></p>
+                    </div>
+                </div>
+                <button onclick="hideNewsFlash()" class="text-white hover:text-gray-200 transition-colors">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- Top Section: Market Overview -->
+        <div class="mb-8">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+                <span class="mr-3">📊</span>
+                Market Overview
+            </h2>
+            
+            <!-- Market Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                <!-- Nifty 50 Card -->
+                <div class="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-blue-500 hover:shadow-xl transition-shadow duration-300">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Nifty 50</p>
+                            <p class="text-3xl font-bold text-gray-900" id="niftyPrice">₹0.00</p>
+                            <p class="text-sm font-medium" id="niftyChange">+0.00 (0.00%)</p>
                         </div>
-                        <div class="mt-2">
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" id="sentimentBadge">
+                        <div class="text-center">
+                            <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center shadow-inner">
+                                <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium" id="sentimentBadge">
                                 NEUTRAL
                             </span>
                         </div>
+                        <div class="text-right text-xs text-gray-500">
+                            <div>Vol: <span id="niftyVolume" class="font-medium">0</span></div>
+                            <div id="lastUpdated">--</div>
+                        </div>
                     </div>
                 </div>
-                <div class="mt-4">
-                    <p class="text-xs text-gray-500">Volume: <span id="niftyVolume">0</span></p>
-                    <p class="text-xs text-gray-500">Last Updated: <span id="lastUpdated">--</span></p>
-                </div>
-            </div>
 
-            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-gray-600">Active Signals</p>
-                        <p class="text-2xl font-bold text-gray-900" id="activeSignals">0</p>
-                    </div>
-                    <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                        <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                        </svg>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-gray-600">Success Rate</p>
-                        <p class="text-2xl font-bold text-gray-900" id="successRate">0%</p>
-                    </div>
-                    <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                        <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                        </svg>
+                <!-- Active Signals Card -->
+                <div class="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-green-500 hover:shadow-xl transition-shadow duration-300">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Active Signals</p>
+                            <p class="text-3xl font-bold text-gray-900" id="activeSignals">0</p>
+                            <p class="text-sm text-green-600 font-medium">AI Generated</p>
+                        </div>
+                        <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center shadow-inner">
+                            <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-gray-600">WhatsApp Users</p>
-                        <p class="text-2xl font-bold text-gray-900" id="whatsappUsers">0</p>
+                <!-- Success Rate Card -->
+                <div class="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-purple-500 hover:shadow-xl transition-shadow duration-300">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">Success Rate</p>
+                            <p class="text-3xl font-bold text-gray-900" id="successRate">0%</p>
+                            <p class="text-sm text-purple-600 font-medium">Accuracy</p>
+                        </div>
+                        <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center shadow-inner">
+                            <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                        </div>
                     </div>
-                    <div class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                        <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a2 2 0 01-2-2v-6a2 2 0 012-2h8z"></path>
-                        </svg>
+                </div>
+
+                <!-- WhatsApp Users Card -->
+                <div class="bg-white rounded-2xl shadow-lg p-6 border-l-4 border-yellow-500 hover:shadow-xl transition-shadow duration-300">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-600 uppercase tracking-wide">WhatsApp Users</p>
+                            <p class="text-3xl font-bold text-gray-900" id="whatsappUsers">0</p>
+                            <p class="text-sm text-yellow-600 font-medium">Connected</p>
+                        </div>
+                        <div class="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center shadow-inner">
+                            <svg class="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a2 2 0 01-2-2v-6a2 2 0 012-2h8z"></path>
+                            </svg>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- News Flash Alert Bar -->
-        <div id="newsFlashBar" class="hidden mb-6">
-            <div class="bg-gradient-to-r from-red-500 to-orange-500 text-white p-4 rounded-lg shadow-lg">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center space-x-3">
-                        <div class="animate-pulse">
-                            <span class="text-2xl">🚨</span>
-                        </div>
-                        <div>
-                            <h4 class="font-bold text-lg">BREAKING NEWS</h4>
-                            <p id="newsFlashText" class="text-sm opacity-90"></p>
+        <!-- Main Content Grid -->
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
+            
+            <!-- Left Column: Trading Signals & Strategies -->
+            <div class="xl:col-span-2 space-y-8">
+                
+                <!-- AI Trading Signals -->
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-200">
+                    <div class="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50 rounded-t-2xl">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <h3 class="text-xl font-bold text-gray-900 flex items-center">
+                                    <span class="mr-2">🤖</span>
+                                    Latest AI Signals
+                                </h3>
+                                <p class="text-sm text-gray-600">Real-time trading signals powered by AI</p>
+                            </div>
+                            <div class="flex space-x-2">
+                                <button onclick="loadNewsFlash()" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm transition-colors duration-200 shadow-md">
+                                    📰 News Flash
+                                </button>
+                                <button onclick="refreshPage()" class="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm transition-colors duration-200 shadow-md">
+                                    🔄 Refresh
+                                </button>
+                            </div>
                         </div>
                     </div>
-                    <button onclick="hideNewsFlash()" class="text-white hover:text-gray-200">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
-                    </button>
+                    <div class="p-6">
+                        <div id="signalsContainer" class="space-y-4">
+                            <div class="text-center py-12 text-gray-500">
+                                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                                <div>Loading signals...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Trading Strategies Section -->
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-200">
+                    <div class="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-green-50 to-blue-50 rounded-t-2xl">
+                        <div class="flex justify-between items-center">
+                            <h2 class="text-xl font-bold text-gray-800 flex items-center">
+                                <span class="mr-2">🎯</span>
+                                AI Trading Strategies
+                            </h2>
+                            <button onclick="refreshStrategies()" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors duration-200 shadow-md">
+                                Refresh Analysis
+                            </button>
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        <div id="strategiesContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="col-span-2 text-center py-8 text-gray-500">
+                                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                                Loading strategies...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Next Day Prediction Section -->
+                <div class="bg-gradient-to-r from-purple-50 via-blue-50 to-indigo-50 rounded-2xl shadow-lg p-6 border border-purple-200">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-bold text-gray-800 flex items-center">
+                            <span class="mr-2">🔮</span>
+                            Next Day Market Prediction
+                        </h2>
+                        <div class="flex space-x-2">
+                            <button onclick="generatePrediction()" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg text-sm transition-colors duration-200 shadow-md">
+                                Generate Prediction
+                            </button>
+                            <button onclick="loadNextDayPrediction()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm transition-colors duration-200 shadow-md">
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="predictionContainer" class="space-y-4">
+                        <div class="text-center py-12 text-gray-500">
+                            <div class="text-6xl mb-4">📊</div>
+                            <div class="text-lg font-medium">Next-day prediction will be available after market close</div>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <!-- Trading Signals -->
-            <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200">
-                <div class="px-6 py-4 border-b border-gray-200">
-                    <div class="flex justify-between items-center">
-                        <div>
-                            <h3 class="text-lg font-semibold text-gray-900">Latest AI Signals</h3>
-                            <p class="text-sm text-gray-600">Real-time trading signals powered by AI</p>
-                        </div>
-                        <button onclick="loadNewsFlash()" class="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-sm hover:bg-blue-200">
-                            📰 News Flash
-                        </button>
-                    </div>
-                </div>
-                <div class="p-6">
-                    <div id="signalsContainer" class="space-y-4">
-                        <div class="text-center py-8 text-gray-500">
-                            Loading signals...
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Options Chain & News -->
-            <div class="space-y-6">
+            <!-- Right Column: Options Chain, News & WhatsApp -->
+            <div class="space-y-8">
+                
                 <!-- Options Chain -->
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200">
-                    <div class="px-6 py-4 border-b border-gray-200">
-                        <h3 class="text-lg font-semibold text-gray-900">Options Chain</h3>
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-200">
+                    <div class="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-t-2xl">
+                        <h3 class="text-lg font-bold text-gray-900 flex items-center">
+                            <span class="mr-2">📈</span>
+                            Options Chain
+                        </h3>
                         <p class="text-sm text-gray-600">Live Nifty 50 options data</p>
                     </div>
                     <div class="p-6">
                         <div id="optionsContainer" class="space-y-3">
                             <div class="text-center py-8 text-gray-500">
-                                Loading options...
+                                <div class="animate-pulse text-4xl mb-2">⏳</div>
+                                <div>Loading options...</div>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- News Flash -->
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200">
-                    <div class="px-6 py-4 border-b border-gray-200">
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-200">
+                    <div class="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-red-50 to-pink-50 rounded-t-2xl">
                         <div class="flex justify-between items-center">
                             <div>
-                                <h3 class="text-lg font-semibold text-gray-900">News Flash</h3>
+                                <h3 class="text-lg font-bold text-gray-900 flex items-center">
+                                    <span class="mr-2">📰</span>
+                                    News Flash
+                                </h3>
                                 <p class="text-sm text-gray-600">Breaking market news</p>
                             </div>
-                            <button onclick="checkNews()" class="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-sm hover:bg-green-200">
+                            <button onclick="checkNews()" class="px-3 py-1 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm transition-colors duration-200 shadow-md">
                                 🔄 Refresh
                             </button>
                         </div>
                     </div>
                     <div class="p-6">
                         <div id="newsContainer" class="space-y-3 max-h-96 overflow-y-auto">
-                            <div class="text-center py-4 text-gray-500">
-                                Loading news...
+                            <div class="text-center py-8 text-gray-500">
+                                <div class="animate-bounce text-4xl mb-2">📡</div>
+                                <div>Loading news...</div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- Next Day Prediction Section -->
-        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow-md p-6 mb-6 border border-blue-200">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-bold text-gray-800">🔮 Next Day Market Prediction</h2>
-                <div class="flex space-x-2">
-                    <button onclick="generatePrediction()" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg text-sm">
-                        Generate Prediction
-                    </button>
-                    <button onclick="loadNextDayPrediction()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">
-                        Refresh
-                    </button>
-                </div>
-            </div>
-
-            <div id="predictionContainer" class="space-y-4">
-                <div class="text-center py-8 text-gray-500">
-                    <div class="mb-2">📊</div>
-                    <div>Next-day prediction will be available after market close</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Trading Strategies Section -->
-        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-bold text-gray-800">🎯 AI Trading Strategies</h2>
-                <button onclick="refreshStrategies()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
-                    Refresh Analysis
-                </button>
-            </div>
-
-            <div id="strategiesContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <!-- Strategies will be loaded here -->
-            </div>
-        </div>
-
-        <!-- WhatsApp Management -->
-        <div class="mt-8 bg-white rounded-xl shadow-sm border border-gray-200">
-            <div class="px-6 py-4 border-b border-gray-200">
-                <h3 class="text-lg font-semibold text-gray-900">WhatsApp Notifications</h3>
-                <p class="text-sm text-gray-600">Manage users receiving trading alerts</p>
-            </div>
-            <div class="p-6">
-                <div class="flex space-x-4 mb-6">
-                    <input type="tel" id="phoneInput" placeholder="+91XXXXXXXXXX" 
-                           class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                    <button onclick="addWhatsAppUser()" 
-                            class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:ring-2 focus:ring-green-500">
-                        Add User
-                    </button>
-                </div>
-                <div id="whatsappUsersContainer" class="space-y-2">
-                    <div class="text-center py-4 text-gray-500">
-                        Loading WhatsApp users...
+                <!-- WhatsApp Management -->
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-200">
+                    <div class="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50 rounded-t-2xl">
+                        <h3 class="text-lg font-bold text-gray-900 flex items-center">
+                            <span class="mr-2">💬</span>
+                            WhatsApp Notifications
+                        </h3>
+                        <p class="text-sm text-gray-600">Manage users receiving trading alerts</p>
+                    </div>
+                    <div class="p-6">
+                        <div class="flex space-x-2 mb-6">
+                            <input type="tel" id="phoneInput" placeholder="+91XXXXXXXXXX" 
+                                   class="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200">
+                            <button onclick="addWhatsAppUser()" 
+                                    class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg focus:ring-2 focus:ring-green-500 transition-colors duration-200 shadow-md">
+                                Add User
+                            </button>
+                        </div>
+                        <div id="whatsappUsersContainer" class="space-y-2">
+                            <div class="text-center py-6 text-gray-500">
+                                <div class="text-3xl mb-2">👥</div>
+                                <div>Loading WhatsApp users...</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -274,23 +349,28 @@
 
     socket.on('market_update', function(data) {
         console.log('Market update received:', data);
-        updateNiftyData(data.nifty_data);
-        updateSignals(data.new_signals);
-        updateOptionsChain(data.options_chain);
+        if (data.nifty_data) updateNiftyData(data.nifty_data);
+        if (data.new_signals) updateSignals(data.new_signals);
+        if (data.options_chain) updateOptionsChain(data.options_chain);
     });
 
     socket.on('news_flash', function(data) {
         console.log('News flash received:', data);
         showNewsFlash(data.news);
-        loadNewsFlash(); // Refresh news list
+        loadNewsFlash();
+    });
+
+    socket.on('next_day_prediction', function(data) {
+        console.log('Next-day prediction received:', data);
+        loadNextDayPrediction();
     });
 
     function updateConnectionStatus(connected) {
         const statusDot = document.getElementById('statusDot');
         if (connected) {
-            statusDot.className = 'w-2 h-2 rounded-full mr-2 bg-green-500';
+            statusDot.className = 'w-3 h-3 rounded-full mr-2 bg-green-500 animate-pulse';
         } else {
-            statusDot.className = 'w-2 h-2 rounded-full mr-2 bg-red-500';
+            statusDot.className = 'w-3 h-3 rounded-full mr-2 bg-red-500 animate-pulse';
         }
     }
 
@@ -299,33 +379,33 @@
         const statusText = document.getElementById('statusText');
         const statusDot = document.getElementById('statusDot');
 
-        let bgClass = 'bg-gray-100 text-gray-800';
-        let dotClass = 'w-2 h-2 rounded-full mr-2 bg-gray-500';
+        let bgClass = 'bg-gray-100 text-gray-800 border-gray-300';
+        let dotClass = 'w-3 h-3 rounded-full mr-2 bg-gray-500 animate-pulse';
 
         switch(status) {
             case 'OPEN':
-                bgClass = 'bg-green-100 text-green-800';
-                dotClass = 'w-2 h-2 rounded-full mr-2 bg-green-500';
+                bgClass = 'bg-green-100 text-green-800 border-green-300';
+                dotClass = 'w-3 h-3 rounded-full mr-2 bg-green-500 animate-pulse';
                 statusText.textContent = 'Market Open';
                 break;
             case 'CLOSED':
-                bgClass = 'bg-red-100 text-red-800';
-                dotClass = 'w-2 h-2 rounded-full mr-2 bg-red-500';
+                bgClass = 'bg-red-100 text-red-800 border-red-300';
+                dotClass = 'w-3 h-3 rounded-full mr-2 bg-red-500 animate-pulse';
                 statusText.textContent = 'Market Closed';
                 break;
             case 'PRE_MARKET':
-                bgClass = 'bg-yellow-100 text-yellow-800';
-                dotClass = 'w-2 h-2 rounded-full mr-2 bg-yellow-500';
+                bgClass = 'bg-yellow-100 text-yellow-800 border-yellow-300';
+                dotClass = 'w-3 h-3 rounded-full mr-2 bg-yellow-500 animate-pulse';
                 statusText.textContent = 'Pre-Market';
                 break;
             case 'WEEKEND':
-                bgClass = 'bg-blue-100 text-blue-800';
-                dotClass = 'w-2 h-2 rounded-full mr-2 bg-blue-500';
+                bgClass = 'bg-blue-100 text-blue-800 border-blue-300';
+                dotClass = 'w-3 h-3 rounded-full mr-2 bg-blue-500 animate-pulse';
                 statusText.textContent = 'Weekend';
                 break;
         }
 
-        statusElement.className = `px-3 py-1 rounded-full text-sm font-medium ${bgClass}`;
+        statusElement.className = `px-4 py-2 rounded-full text-sm font-medium border-2 transition-all duration-300 ${bgClass}`;
         statusDot.className = dotClass;
     }
 
@@ -336,18 +416,13 @@
         const changeColor = data.change >= 0 ? 'text-green-600' : 'text-red-600';
         const changeSign = data.change >= 0 ? '+' : '';
         changeElement.textContent = `${changeSign}${data.change.toFixed(2)} (${changeSign}${data.change_percent.toFixed(2)}%)`;
-        changeElement.className = `text-sm ${changeColor}`;
+        changeElement.className = `text-sm font-medium ${changeColor}`;
 
         document.getElementById('niftyVolume').textContent = data.volume.toLocaleString();
         document.getElementById('lastUpdated').textContent = new Date(data.last_updated).toLocaleTimeString();
 
-        // Update market status
         updateMarketStatus(data.market_status);
-
-        // Update sentiment
         updateSentiment(data.sentiment);
-
-        // Update flash message
         updateFlashMessage(data.flash_message);
     }
 
@@ -367,7 +442,7 @@
                 break;
         }
 
-        sentimentBadge.className = `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeClass}`;
+        sentimentBadge.className = `inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${badgeClass}`;
         sentimentBadge.textContent = sentiment;
     }
 
@@ -379,7 +454,6 @@
             flashMessage.textContent = message;
             flashBanner.classList.remove('hidden');
 
-            // Auto-hide after 5 seconds
             setTimeout(() => {
                 flashBanner.classList.add('hidden');
             }, 5000);
@@ -394,8 +468,6 @@
 
     function updateOptionsChain(data) {
         const container = document.getElementById('optionsContainer');
-
-        // Handle new API response format
         const options = data.options || data;
         const marketStatus = data.market_status || 'UNKNOWN';
         const dataAvailable = data.data_available !== undefined ? data.data_available : (options && options.length > 0);
@@ -408,6 +480,7 @@
 
             container.innerHTML = `
                 <div class="text-center py-8">
+                    <div class="text-4xl mb-4">⏰</div>
                     <div class="text-gray-500 mb-2">${statusMessage}</div>
                     ${message ? `<div class="text-sm text-gray-400">${message}</div>` : ''}
                     <div class="mt-4 p-4 bg-blue-50 rounded-lg text-blue-700 text-sm">
@@ -421,31 +494,31 @@
 
         const html = `
             <div class="mb-3 flex justify-between items-center">
-                <span class="text-sm text-green-600 font-medium">
-                    <i class="fas fa-circle text-green-500 mr-1"></i>
+                <span class="text-sm text-green-600 font-medium flex items-center">
+                    <span class="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
                     Live Options Data
                 </span>
-                <span class="text-xs text-gray-500">Market: ${marketStatus.replace('_', ' ')}</span>
+                <span class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">Market: ${marketStatus.replace('_', ' ')}</span>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="bg-gray-50 text-gray-600 text-xs uppercase">
-                            <th class="px-3 py-2 text-left">Call LTP</th>
-                            <th class="px-3 py-2 text-left">Call Vol</th>
-                            <th class="px-3 py-2 text-center font-bold">Strike</th>
-                            <th class="px-3 py-2 text-right">Put Vol</th>
-                            <th class="px-3 py-2 text-right">Put LTP</th>
+                            <th class="px-3 py-3 text-left font-semibold">Call LTP</th>
+                            <th class="px-3 py-3 text-left font-semibold">Call Vol</th>
+                            <th class="px-3 py-3 text-center font-bold bg-yellow-100">Strike</th>
+                            <th class="px-3 py-3 text-right font-semibold">Put Vol</th>
+                            <th class="px-3 py-3 text-right font-semibold">Put LTP</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${options.map(option => `
-                            <tr class="border-b border-gray-100 hover:bg-gray-50">
-                                <td class="px-3 py-2 text-green-600 font-medium">₹${option.call_ltp.toFixed(2)}</td>
-                                <td class="px-3 py-2 text-gray-600">${option.call_volume.toLocaleString()}</td>
-                                <td class="px-3 py-2 text-center font-bold bg-yellow-50">${option.strike_price}</td>
-                                <td class="px-3 py-2 text-right text-gray-600">${option.put_volume.toLocaleString()}</td>
-                                <td class="px-3 py-2 text-right text-red-600 font-medium">₹${option.put_ltp.toFixed(2)}</td>
+                            <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors duration-200">
+                                <td class="px-3 py-3 text-green-600 font-medium">₹${option.call_ltp.toFixed(2)}</td>
+                                <td class="px-3 py-3 text-gray-600">${option.call_volume.toLocaleString()}</td>
+                                <td class="px-3 py-3 text-center font-bold bg-yellow-50 border-l border-r border-yellow-200">${option.strike_price}</td>
+                                <td class="px-3 py-3 text-right text-gray-600">${option.put_volume.toLocaleString()}</td>
+                                <td class="px-3 py-3 text-right text-red-600 font-medium">₹${option.put_ltp.toFixed(2)}</td>
                             </tr>
                         `).join('')}
                     </tbody>
@@ -477,39 +550,53 @@
                 const container = document.getElementById('signalsContainer');
 
                 if (signals.length === 0) {
-                    container.innerHTML = '<div class="text-center py-8 text-gray-500">No signals available</div>';
+                    container.innerHTML = `
+                        <div class="text-center py-12 text-gray-500">
+                            <div class="text-6xl mb-4">📡</div>
+                            <div class="text-lg font-medium">No signals available</div>
+                            <div class="text-sm">Waiting for market opportunities...</div>
+                        </div>
+                    `;
                     return;
                 }
 
                 const html = signals.slice(0, 10).map(signal => `
-                    <div class="border border-gray-200 rounded-lg p-4">
-                        <div class="flex justify-between items-start mb-3">
+                    <div class="border-2 border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300 ${signal.type === 'CALL' ? 'hover:border-green-300 bg-gradient-to-r from-green-50 to-emerald-50' : 'hover:border-red-300 bg-gradient-to-r from-red-50 to-rose-50'}">
+                        <div class="flex justify-between items-start mb-4">
                             <div class="flex items-center space-x-3">
-                                <span class="px-2 py-1 text-xs font-medium rounded ${signal.type === 'CALL' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                <span class="px-3 py-1 text-sm font-bold text-white rounded-full shadow-lg ${signal.type === 'CALL' ? 'bg-gradient-to-r from-green-500 to-green-600' : 'bg-gradient-to-r from-red-500 to-red-600'}">
                                     ${signal.type}
                                 </span>
-                                <span class="text-lg font-semibold">₹${signal.strike_price}</span>
+                                <span class="text-xl font-bold text-gray-900">₹${signal.strike_price}</span>
+                                <span class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                                    ${signal.strategy_type}
+                                </span>
                             </div>
-                            <span class="px-2 py-1 text-xs font-medium rounded-full ${signal.confidence >= 80 ? 'bg-green-100 text-green-800' : signal.confidence >= 60 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}">
-                                ${signal.confidence}%
+                            <span class="px-3 py-1 text-sm font-bold rounded-full ${signal.confidence >= 80 ? 'bg-green-100 text-green-800' : signal.confidence >= 60 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}">
+                                ${signal.confidence}% Confidence
                             </span>
                         </div>
 
-                        <div class="grid grid-cols-2 gap-4 mb-3 text-sm">
-                            <div>
-                                <span class="text-gray-600">Target:</span>
-                                <span class="font-medium text-green-600">₹${signal.target_price}</span>
+                        <div class="grid grid-cols-2 gap-4 mb-4 text-sm">
+                            <div class="bg-white p-3 rounded-lg shadow-sm">
+                                <span class="text-gray-600 block">Target Price</span>
+                                <span class="font-bold text-green-600 text-lg">₹${signal.target_price}</span>
                             </div>
-                            <div>
-                                <span class="text-gray-600">Stop Loss:</span>
-                                <span class="font-medium text-red-600">₹${signal.stop_loss}</span>
+                            <div class="bg-white p-3 rounded-lg shadow-sm">
+                                <span class="text-gray-600 block">Stop Loss</span>
+                                <span class="font-bold text-red-600 text-lg">₹${signal.stop_loss}</span>
                             </div>
                         </div>
 
-                        <p class="text-sm text-gray-600 mb-2">${signal.reasoning}</p>
+                        <div class="bg-white p-3 rounded-lg shadow-sm mb-3">
+                            <p class="text-sm text-gray-700 font-medium mb-1">Technical Analysis:</p>
+                            <p class="text-sm text-gray-600">${signal.reasoning}</p>
+                        </div>
+
                         <div class="flex justify-between items-center text-xs text-gray-500">
-                            <span>Expiry: ${signal.expiry_date}</span>
-                            <span>${new Date(signal.created_at).toLocaleTimeString()}</span>
+                            <span class="bg-gray-100 px-2 py-1 rounded-full">Expiry: ${signal.expiry_date}</span>
+                            <span class="bg-gray-100 px-2 py-1 rounded-full">${signal.holding_period}</span>
+                            <span class="bg-gray-100 px-2 py-1 rounded-full">${new Date(signal.created_at).toLocaleTimeString()}</span>
                         </div>
                     </div>
                 `).join('');
@@ -518,7 +605,12 @@
             })
             .catch(error => {
                 console.error('Error loading signals:', error);
-                document.getElementById('signalsContainer').innerHTML = '<div class="text-center py-8 text-red-500">Error loading signals</div>';
+                document.getElementById('signalsContainer').innerHTML = `
+                    <div class="text-center py-12 text-red-500">
+                        <div class="text-4xl mb-4">⚠️</div>
+                        <div>Error loading signals</div>
+                    </div>
+                `;
             });
     }
 
@@ -540,15 +632,27 @@
                 const container = document.getElementById('whatsappUsersContainer');
 
                 if (users.length === 0) {
-                    container.innerHTML = '<div class="text-center py-4 text-gray-500">No WhatsApp users registered</div>';
+                    container.innerHTML = `
+                        <div class="text-center py-6 text-gray-500">
+                            <div class="text-3xl mb-2">👥</div>
+                            <div>No WhatsApp users registered</div>
+                        </div>
+                    `;
                     return;
                 }
 
                 const html = users.map(user => `
-                    <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                        <span class="text-sm font-medium">${user.phone_number}</span>
+                    <div class="flex justify-between items-center p-4 bg-gray-50 rounded-lg border hover:shadow-md transition-shadow duration-200">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                                <span class="text-green-600 text-sm">📱</span>
+                            </div>
+                            <span class="font-medium">${user.phone_number}</span>
+                        </div>
                         <button onclick="removeWhatsAppUser('${user.phone_number}')" 
-                                class="text-red-600 hover:text-red-800 text-sm">Remove</button>
+                                class="text-red-600 hover:text-red-800 text-sm bg-red-50 hover:bg-red-100 px-3 py-1 rounded-lg transition-colors duration-200">
+                            Remove
+                        </button>
                     </div>
                 `).join('');
 
@@ -624,7 +728,6 @@
         flashText.innerHTML = `${impactEmoji} ${sentimentEmoji} ${news.headline} - ${news.market_reaction}`;
         flashBar.classList.remove('hidden');
 
-        // Auto-hide after 15 seconds for medium impact, 30 for high impact
         const hideTime = news.impact === 'HIGH' ? 30000 : 15000;
         setTimeout(() => {
             flashBar.classList.add('hidden');
@@ -641,12 +744,17 @@
             .then(news => {
                 const container = document.getElementById('newsContainer');
                 if (news.length === 0) {
-                    container.innerHTML = '<div class="text-center py-4 text-gray-500">No recent news flashes</div>';
+                    container.innerHTML = `
+                        <div class="text-center py-8 text-gray-500">
+                            <div class="text-4xl mb-2">📰</div>
+                            <div>No recent news flashes</div>
+                        </div>
+                    `;
                     return;
                 }
 
                 const html = news.slice(0, 10).map(item => {
-                    const impactColor = item.impact === 'HIGH' ? 'text-red-600' : item.impact === 'MEDIUM' ? 'text-yellow-600' : 'text-blue-600';
+                    const impactColor = item.impact === 'HIGH' ? 'text-red-600 bg-red-50' : item.impact === 'MEDIUM' ? 'text-yellow-600 bg-yellow-50' : 'text-blue-600 bg-blue-50';
                     const sentimentColor = item.sentiment === 'POSITIVE' ? 'text-green-600' : item.sentiment === 'NEGATIVE' ? 'text-red-600' : 'text-gray-600';
                     const categoryEmoji = {
                         'WAR': '⚔️',
@@ -658,26 +766,28 @@
                     }[item.category] || '📰';
 
                     return `
-                        <div class="border border-gray-200 rounded-lg p-3 hover:bg-gray-50">
-                            <div class="flex items-start justify-between mb-2">
-                                <span class="px-2 py-1 text-xs font-medium rounded ${impactColor.replace('text-', 'bg-').replace('-600', '-100')} ${impactColor}">
-                                    ${item.impact}
+                        <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors duration-200 hover:shadow-md">
+                            <div class="flex items-start justify-between mb-3">
+                                <span class="px-3 py-1 text-xs font-medium rounded-full ${impactColor}">
+                                    ${item.impact} IMPACT
                                 </span>
-                                <span class="text-xs text-gray-500">${new Date(item.timestamp).toLocaleTimeString()}</span>
+                                <span class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">${new Date(item.timestamp).toLocaleTimeString()}</span>
                             </div>
 
-                            <div class="flex items-center space-x-2 mb-2">
-                                <span class="text-lg">${categoryEmoji}</span>
-                                <span class="text-xs font-medium text-gray-600">${item.category}</span>
-                                <span class="text-xs ${sentimentColor}">${item.sentiment}</span>
+                            <div class="flex items-center space-x-2 mb-3">
+                                <span class="text-xl">${categoryEmoji}</span>
+                                <span class="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded-full">${item.category}</span>
+                                <span class="text-xs ${sentimentColor} font-medium">${item.sentiment}</span>
                             </div>
 
-                            <h4 class="text-sm font-semibold text-gray-900 mb-1">${item.headline}</h4>
-                            <p class="text-xs text-gray-600 mb-2">${item.market_reaction}</p>
+                            <h4 class="text-sm font-semibold text-gray-900 mb-2">${item.headline}</h4>
+                            <p class="text-xs text-gray-600 mb-3 bg-gray-50 p-2 rounded">${item.market_reaction}</p>
 
                             <div class="flex justify-between items-center">
                                 <span class="text-xs text-gray-500">${item.source}</span>
-                                <a href="${item.url}" target="_blank" class="text-xs text-blue-600 hover:text-blue-800">Read more →</a>
+                                <a href="${item.url}" target="_blank" class="text-xs text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded transition-colors duration-200">
+                                    Read more →
+                                </a>
                             </div>
                         </div>
                     `;
@@ -687,7 +797,12 @@
             })
             .catch(error => {
                 console.error('Error loading news:', error);
-                document.getElementById('newsContainer').innerHTML = '<div class="text-center py-4 text-red-500">Error loading news</div>';
+                document.getElementById('newsContainer').innerHTML = `
+                    <div class="text-center py-8 text-red-500">
+                        <div class="text-4xl mb-2">⚠️</div>
+                        <div>Error loading news</div>
+                    </div>
+                `;
             });
     }
 
@@ -716,7 +831,6 @@
             });
     }
 
-    // Load trading strategies
     function loadTradingStrategies() {
         fetch('/api/trading/strategies')
             .then(response => response.json())
@@ -725,7 +839,12 @@
                 const strategies = data.strategies || [];
 
                 if (strategies.length === 0) {
-                    container.innerHTML = '<p class="text-gray-500 text-center py-4 col-span-4">No strategy analysis available</p>';
+                    container.innerHTML = `
+                        <div class="col-span-2 text-center py-8 text-gray-500">
+                            <div class="text-4xl mb-4">📊</div>
+                            <div>No strategy analysis available</div>
+                        </div>
+                    `;
                     return;
                 }
 
@@ -743,47 +862,44 @@
                         'HIGH': 'red'
                     }[strategy.risk_level] || 'gray';
 
-                    const bgColor = strategy.recommended ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200';
+                    const bgColor = strategy.recommended ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200' : 'bg-gradient-to-r from-gray-50 to-slate-50 border-gray-200';
                     const textColor = strategy.recommended ? 'text-green-800' : 'text-gray-600';
 
                     return `
-                        <div class="border-2 ${bgColor} rounded-lg p-4 ${textColor}">
-                            <div class="flex items-center justify-between mb-2">
+                        <div class="border-2 ${bgColor} rounded-xl p-4 ${textColor} hover:shadow-lg transition-shadow duration-300">
+                            <div class="flex items-center justify-between mb-3">
                                 <div class="flex items-center">
-                                    <span class="text-2xl mr-2">${strategyEmoji}</span>
+                                    <span class="text-3xl mr-3">${strategyEmoji}</span>
                                     <h3 class="font-bold text-sm">${strategy.strategy_type}</h3>
                                 </div>
-                                <span class="text-xs bg-${riskColor}-100 text-${riskColor}-800 px-2 py-1 rounded">
+                                <span class="text-xs bg-${riskColor}-100 text-${riskColor}-800 px-3 py-1 rounded-full font-medium">
                                     ${strategy.risk_level}
                                 </span>
                             </div>
 
-                            <div class="mb-3">
-                                <div class="flex items-center justify-between mb-1">
-                                    <span class="text-xs">Confidence</span>
+                            <div class="mb-4">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-xs font-medium">Confidence</span>
                                     <span class="text-xs font-bold">${strategy.confidence}%</span>
                                 </div>
-                                <div class="w-full bg-gray-200 rounded-full h-2">
-                                    <div class="bg-blue-600 h-2 rounded-full" style="width: ${strategy.confidence}%"></div>
+                                <div class="w-full bg-gray-200 rounded-full h-3">
+                                    <div class="bg-gradient-to-r from-blue-500 to-purple-500 h-3 rounded-full transition-all duration-500" style="width: ${strategy.confidence}%"></div>
                                 </div>
                             </div>
 
-                            <div class="text-xs mb-2">
-                                <strong>Duration:</strong> ${strategy.target_duration}
+                            <div class="text-xs mb-3 space-y-1">
+                                <div><strong>Duration:</strong> ${strategy.target_duration}</div>
+                                <div><strong>Capital:</strong> ${strategy.capital_allocation}</div>
                             </div>
 
-                            <div class="text-xs mb-2">
-                                <strong>Capital:</strong> ${strategy.capital_allocation}
+                            <div class="text-xs mb-4 bg-white p-2 rounded-lg">
+                                <strong>Analysis:</strong> ${strategy.reasoning}
                             </div>
 
-                            <div class="text-xs mb-2">
-                                <strong>Logic:</strong> ${strategy.reasoning}
-                            </div>
-
-                            <div class="mt-3 pt-2 border-t border-gray-200">
+                            <div class="text-center">
                                 ${strategy.recommended 
-                                    ? '<span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">✅ RECOMMENDED</span>'
-                                    : '<span class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">⏸️ WAIT</span>'
+                                    ? '<span class="text-xs bg-green-500 text-white px-3 py-1 rounded-full font-medium">✅ RECOMMENDED</span>'
+                                    : '<span class="text-xs bg-gray-400 text-white px-3 py-1 rounded-full font-medium">⏸️ WAIT</span>'
                                 }
                             </div>
                         </div>
@@ -792,16 +908,19 @@
             })
             .catch(error => {
                 console.error('Error loading strategies:', error);
-                document.getElementById('strategiesContainer').innerHTML = '<p class="text-red-500 text-center py-4 col-span-4">Error loading strategies</p>';
+                document.getElementById('strategiesContainer').innerHTML = `
+                    <div class="col-span-2 text-center py-8 text-red-500">
+                        <div class="text-4xl mb-4">⚠️</div>
+                        <div>Error loading strategies</div>
+                    </div>
+                `;
             });
     }
 
-    // Refresh strategies manually
     function refreshStrategies() {
         loadTradingStrategies();
     }
 
-    // Load next-day prediction
     function loadNextDayPrediction() {
         fetch('/api/prediction/next-day')
             .then(response => response.json())
@@ -810,10 +929,12 @@
 
                 if (!data.available) {
                     container.innerHTML = `
-                        <div class="text-center py-8 text-gray-500">
-                            <div class="mb-2">📊</div>
-                            <div>${data.message}</div>
-                            <div class="text-sm mt-2">Market Status: ${data.market_status.replace('_', ' ')}</div>
+                        <div class="text-center py-12 text-gray-500">
+                            <div class="text-6xl mb-4">📊</div>
+                            <div class="text-lg font-medium">${data.message}</div>
+                            <div class="text-sm mt-2 bg-blue-50 text-blue-700 p-3 rounded-lg">
+                                Market Status: ${data.market_status.replace('_', ' ')}
+                            </div>
                         </div>
                     `;
                     return;
@@ -826,84 +947,88 @@
 
                 container.innerHTML = `
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <!-- Main Prediction -->
                         <div class="lg:col-span-1">
-                            <div class="bg-white rounded-lg p-6 shadow-sm border">
-                                <div class="text-center mb-4">
-                                    <div class="text-3xl mb-2">
+                            <div class="bg-white rounded-xl p-6 shadow-lg border-2 ${directionBg.replace('bg-', 'border-')}">
+                                <div class="text-center mb-6">
+                                    <div class="text-5xl mb-3">
                                         ${prediction.direction === 'BULLISH' ? '🚀' : prediction.direction === 'BEARISH' ? '📉' : '↔️'}
                                     </div>
-                                    <h3 class="text-xl font-bold ${directionColor}">${prediction.direction}</h3>
+                                    <h3 class="text-2xl font-bold ${directionColor}">${prediction.direction}</h3>
                                     <p class="text-sm text-gray-600">for ${prediction.prediction_date}</p>
                                 </div>
 
-                                <div class="space-y-3">
-                                    <div class="flex justify-between">
-                                        <span class="text-gray-600">Confidence:</span>
-                                        <span class="font-semibold ${confidenceColor}">${prediction.confidence}%</span>
+                                <div class="space-y-4">
+                                    <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                                        <span class="text-gray-600 font-medium">Confidence:</span>
+                                        <span class="font-bold ${confidenceColor} text-lg">${prediction.confidence}%</span>
                                     </div>
-                                    <div class="flex justify-between">
-                                        <span class="text-gray-600">Probability Up:</span>
-                                        <span class="font-semibold">${prediction.probability_up}%</span>
+                                    <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                                        <span class="text-gray-600 font-medium">Probability Up:</span>
+                                        <span class="font-bold text-lg">${prediction.probability_up}%</span>
                                     </div>
-                                    <div class="flex justify-between">
-                                        <span class="text-gray-600">Market Regime:</span>
-                                        <span class="font-semibold">${prediction.market_regime}</span>
+                                    <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                                        <span class="text-gray-600 font-medium">Market Regime:</span>
+                                        <span class="font-bold text-lg">${prediction.market_regime}</span>
                                     </div>
-                                    <div class="flex justify-between">
-                                        <span class="text-gray-600">Volatility:</span>
-                                        <span class="font-semibold">${prediction.volatility_outlook}</span>
+                                    <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                                        <span class="text-gray-600 font-medium">Volatility:</span>
+                                        <span class="font-bold text-lg">${prediction.volatility_outlook}</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Price Targets & Analysis -->
                         <div class="lg:col-span-2">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                <!-- Price Targets -->
-                                <div class="bg-white rounded-lg p-4 shadow-sm border">
-                                    <h4 class="font-semibold text-gray-800 mb-3">💹 Price Targets</h4>
-                                    <div class="space-y-2 text-sm">
-                                        <div class="flex justify-between">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                <div class="bg-white rounded-xl p-4 shadow-lg border border-gray-200">
+                                    <h4 class="font-bold text-gray-800 mb-4 flex items-center">
+                                        <span class="mr-2">💹</span>
+                                        Price Targets
+                                    </h4>
+                                    <div class="space-y-3 text-sm">
+                                        <div class="flex justify-between p-2 bg-green-50 rounded">
                                             <span>Expected High:</span>
-                                            <span class="font-medium text-green-600">₹${prediction.price_targets.high}</span>
+                                            <span class="font-bold text-green-600">₹${prediction.price_targets.high}</span>
                                         </div>
-                                        <div class="flex justify-between">
+                                        <div class="flex justify-between p-2 bg-red-50 rounded">
                                             <span>Expected Low:</span>
-                                            <span class="font-medium text-red-600">₹${prediction.price_targets.low}</span>
+                                            <span class="font-bold text-red-600">₹${prediction.price_targets.low}</span>
                                         </div>
-                                        <div class="flex justify-between">
+                                        <div class="flex justify-between p-2 bg-blue-50 rounded">
                                             <span>Range:</span>
-                                            <span class="font-medium">₹${prediction.price_targets.expected_range}</span>
+                                            <span class="font-bold text-blue-600">₹${prediction.price_targets.expected_range}</span>
                                         </div>
                                     </div>
                                 </div>
 
-                                <!-- Key Drivers -->
-                                <div class="bg-white rounded-lg p-4 shadow-sm border">
-                                    <h4 class="font-semibold text-gray-800 mb-3">🔍 Key Drivers</h4>
-                                    <div class="space-y-1 text-sm">
+                                <div class="bg-white rounded-xl p-4 shadow-lg border border-gray-200">
+                                    <h4 class="font-bold text-gray-800 mb-4 flex items-center">
+                                        <span class="mr-2">🔍</span>
+                                        Key Drivers
+                                    </h4>
+                                    <div class="space-y-2 text-sm">
                                         ${prediction.key_drivers.map(driver => `
-                                            <div class="text-gray-700">• ${driver}</div>
+                                            <div class="p-2 bg-gray-50 rounded text-gray-700">• ${driver}</div>
                                         `).join('')}
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Trading Recommendations -->
-                            <div class="bg-white rounded-lg p-4 shadow-sm border">
-                                <h4 class="font-semibold text-gray-800 mb-3">📋 Trading Recommendations</h4>
+                            <div class="bg-white rounded-xl p-4 shadow-lg border border-gray-200">
+                                <h4 class="font-bold text-gray-800 mb-4 flex items-center">
+                                    <span class="mr-2">📋</span>
+                                    Trading Recommendations
+                                </h4>
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                                     ${prediction.trading_recommendations.map(rec => {
-                                        const riskColor = rec.risk_level === 'LOW' ? 'text-green-600' : rec.risk_level === 'HIGH' ? 'text-red-600' : 'text-yellow-600';
+                                        const riskColor = rec.risk_level === 'LOW' ? 'text-green-600 bg-green-50' : rec.risk_level === 'HIGH' ? 'text-red-600 bg-red-50' : 'text-yellow-600 bg-yellow-50';
                                         return `
-                                            <div class="border border-gray-200 rounded p-3">
-                                                <div class="font-medium text-gray-800">${rec.strategy}</div>
-                                                <div class="text-sm text-gray-600 mt-1">${rec.reasoning}</div>
-                                                <div class="flex justify-between mt-2 text-xs">
-                                                    <span class="${riskColor}">${rec.risk_level} Risk</span>
-                                                    <span class="font-medium">${rec.allocation}</span>
+                                            <div class="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow duration-200">
+                                                <div class="font-medium text-gray-800 mb-2">${rec.strategy}</div>
+                                                <div class="text-sm text-gray-600 mb-3">${rec.reasoning}</div>
+                                                <div class="flex justify-between text-xs">
+                                                    <span class="${riskColor} px-2 py-1 rounded-full font-medium">${rec.risk_level} Risk</span>
+                                                    <span class="font-medium bg-blue-100 text-blue-800 px-2 py-1 rounded-full">${rec.allocation}</span>
                                                 </div>
                                             </div>
                                         `;
@@ -912,10 +1037,13 @@
                             </div>
 
                             ${prediction.risk_factors && prediction.risk_factors.length > 0 ? `
-                                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
-                                    <h4 class="font-semibold text-yellow-800 mb-2">⚠️ Risk Factors</h4>
+                                <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mt-4">
+                                    <h4 class="font-bold text-yellow-800 mb-3 flex items-center">
+                                        <span class="mr-2">⚠️</span>
+                                        Risk Factors
+                                    </h4>
                                     <div class="space-y-1 text-sm text-yellow-700">
-                                        ${prediction.risk_factors.map(risk => `<div>• ${risk}</div>`).join('')}
+                                        ${prediction.risk_factors.map(risk => `<div class="p-2 bg-yellow-100 rounded">• ${risk}</div>`).join('')}
                                     </div>
                                 </div>
                             ` : ''}
@@ -925,12 +1053,15 @@
             })
             .catch(error => {
                 console.error('Error loading prediction:', error);
-                document.getElementById('predictionContainer').innerHTML = 
-                    '<div class="text-center py-8 text-red-500">Error loading prediction</div>';
+                document.getElementById('predictionContainer').innerHTML = `
+                    <div class="text-center py-12 text-red-500">
+                        <div class="text-4xl mb-4">⚠️</div>
+                        <div>Error loading prediction</div>
+                    </div>
+                `;
             });
     }
 
-    // Generate new prediction
     function generatePrediction() {
         const button = event.target;
         button.disabled = true;
@@ -960,11 +1091,22 @@
         });
     }
 
-    // Listen for real-time prediction updates
-    socket.on('next_day_prediction', function(data) {
-        console.log('Next-day prediction received:', data);
-        loadNextDayPrediction();
-    });
+    function refreshPage() {
+        location.reload();
+    }
+
+    function logout() {
+        fetch('/logout', {
+            method: 'POST'
+        })
+        .then(() => {
+            window.location.href = '/login';
+        })
+        .catch(error => {
+            console.error('Logout error:', error);
+            window.location.href = '/login';
+        });
+    }
 
     // Initial load
     loadMarketOverview();
@@ -976,11 +1118,11 @@
     loadNextDayPrediction();
 
     // Refresh data periodically
-    setInterval(loadMarketOverview, 30000); // Every 30 seconds
-    setInterval(loadSignals, 60000);        // Every minute
-    setInterval(loadWhatsAppUsers, 300000); // Every 5 minutes
-    setInterval(loadNewsFlash, 120000);     // Every 2 minutes
-    setInterval(loadTradingStrategies, 45000); // Refresh strategies every 45 seconds
-    setInterval(loadNextDayPrediction, 600000); // Refresh prediction every 10 minutes
+    setInterval(loadMarketOverview, 30000);
+    setInterval(loadSignals, 60000);
+    setInterval(loadWhatsAppUsers, 300000);
+    setInterval(loadNewsFlash, 120000);
+    setInterval(loadTradingStrategies, 45000);
+    setInterval(loadNextDayPrediction, 600000);
 </script>
 {% endblock %}
