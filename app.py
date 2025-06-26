@@ -2515,6 +2515,24 @@ def remove_whatsapp_user(phone_number):
         return jsonify({'success': True})
     return jsonify({'error': 'User not found'}), 404
 
+@app.route('/api/mcp/status')
+def mcp_status():
+    """Check MCP server integration status"""
+    return jsonify({
+        'kite_mcp_enabled': bool(os.getenv('ZERODHA_API_KEY')),
+        'claude_desktop_ready': os.path.exists('claude_desktop_config.json'),
+        'tools_available': [
+            'get_portfolio',
+            'get_positions', 
+            'get_quote',
+            'place_order',
+            'get_nifty_options_chain',
+            'generate_ai_trading_signal',
+            'risk_analysis'
+        ],
+        'integration_guide': 'Copy claude_desktop_config.json to Claude Desktop settings'
+    })
+
 @app.route('/api/options-chain')
 def options_chain():
     options_data = zerodha_service.get_options_chain()
