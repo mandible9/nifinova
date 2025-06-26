@@ -1248,7 +1248,7 @@ class TradeManagementService:
     def calculate_win_probability(self, signal: TradingSignal, indicators: Dict, conditions: Dict, 
                                 market_data: Dict, options_data: List[OptionsData]) -> Dict:
         """Calculate probability of winning the trade based on multiple factors"""
-
+        
         probability_factors = []
         total_score = 0
         max_score = 0
@@ -1396,7 +1396,7 @@ class TradeManagementService:
         max_rr = 10
 
         risk_reward = (signal.target_price - signal.strike_price) / (signal.strike_price - signal.stop_loss) if signal.stop_loss > 0 else 0
-
+        
         if risk_reward >= 2.0:
             rr_score += 8
             probability_factors.append(f"Excellent R:R ({risk_reward:.1f}:1)")
@@ -1470,7 +1470,7 @@ class TradeManagementService:
             # Update current LTP (simulated)
             # In real implementation, this would fetch live option prices
             trade.current_ltp = self._get_current_option_ltp(signal, current_market_data)
-
+            
             # Calculate P&L
             if signal.type == 'CALL':
                 trade.pnl = (trade.current_ltp - trade.entry_price) * trade.quantity
@@ -1481,12 +1481,12 @@ class TradeManagementService:
 
             # Check for alerts
             alerts = self._generate_trade_alerts(trade, signal)
-
+            
             for alert in alerts:
                 if alert not in trade.alerts_sent:
                     trade.alerts_sent.append(alert)
                     trade.last_alert_time = datetime.now().isoformat()
-
+                    
                     # Send WhatsApp alert
                     for user in store.whatsapp_users:
                         if user.is_active:
@@ -1505,10 +1505,10 @@ class TradeManagementService:
         """Simulate current option LTP based on market movement"""
         # This is a simplified simulation - in real implementation, 
         # you would fetch live option prices from the exchange
-
+        
         current_price = market_data['last_price']
         strike_price = signal.strike_price
-
+        
         # Basic option pricing simulation
         if signal.type == 'CALL':
             intrinsic = max(0, current_price - strike_price)
@@ -1516,49 +1516,49 @@ class TradeManagementService:
         else:
             intrinsic = max(0, strike_price - current_price)
             time_value = 20 + (abs(current_price - strike_price) * 0.1)
-
+        
         return intrinsic + time_value + random.uniform(-5, 5)
 
     def _generate_trade_alerts(self, trade: ActiveTrade, signal: TradingSignal) -> List[str]:
         """Generate appropriate alerts based on trade performance"""
         alerts = []
-
+        
         # Target hit alert
         if trade.current_ltp >= signal.target_price and not trade.target_hit:
             alerts.append("TARGET_HIT")
             trade.target_hit = True
-
+            
         # Stop loss hit alert
         elif trade.current_ltp <= signal.stop_loss and not trade.sl_hit:
             alerts.append("STOP_LOSS_HIT")
             trade.sl_hit = True
-
+            
         # Profit alerts
         elif trade.pnl_percent >= 50 and "PROFIT_50" not in trade.alerts_sent:
             alerts.append("PROFIT_50")
-
+            
         elif trade.pnl_percent >= 25 and "PROFIT_25" not in trade.alerts_sent:
             alerts.append("PROFIT_25")
-
+            
         # Loss alerts
         elif trade.pnl_percent <= -20 and "LOSS_20" not in trade.alerts_sent:
             alerts.append("LOSS_20")
-
+            
         elif trade.pnl_percent <= -10 and "LOSS_10" not in trade.alerts_sent:
             alerts.append("LOSS_10")
-
+            
         # Time-based alerts
         entry_time = datetime.fromisoformat(trade.entry_time)
         time_elapsed = (datetime.now() - entry_time).total_seconds() / 3600  # hours
-
+        
         if time_elapsed >= 2 and "TIME_2H" not in trade.alerts_sent:
             alerts.append("TIME_2H")
-
+            
         return alerts
 
     def _send_trade_alert(self, phone_number: str, trade: ActiveTrade, signal: TradingSignal, alert_type: str):
         """Send WhatsApp alert for trade updates"""
-
+        
         alert_messages = {
             "TARGET_HIT": f"🎯 TARGET HIT! Trade #{trade.id} reached target ₹{signal.target_price}. Consider booking profits!",
             "STOP_LOSS_HIT": f"🛑 STOP LOSS HIT! Trade #{trade.id} hit SL ₹{signal.stop_loss}. Exit recommended!",
@@ -1568,7 +1568,7 @@ class TradeManagementService:
             "LOSS_10": f"📊 UPDATE: Trade #{trade.id} down {abs(trade.pnl_percent):.1f}%. Stay calm, follow plan!",
             "TIME_2H": f"⏰ TIME UPDATE: Trade #{trade.id} active for 2+ hours. Current P&L: {trade.pnl_percent:+.1f}%"
         }
-
+        
         message = f"""🔔 TRADE ALERT 🔔
 
 {alert_messages.get(alert_type, "Trade Update")}
@@ -2300,19 +2300,19 @@ class AISignalsService:
 
                 # Generate multiple signal candidates and select only top 3 high-probability ones
                 signal_candidates = []
-
+                
                 # Generate 10 different signal variations
                 for i in range(10):
                     # Vary parameters slightly for different signals
                     varied_indicators = indicators.copy()
                     varied_indicators['rsi'] += random.uniform(-3, 3)
                     varied_indicators['volatility'] += random.uniform(-2, 2)
-
+                    
                     signal = self.generate_high_probability_signal(
                         current_price, varied_indicators, conditions, strategies, 
                         nifty_data, options_data
                     )
-
+                    
                     if signal and signal.win_probability >= self.min_probability_threshold:
                         signal_candidates.append(signal)
 
@@ -2332,12 +2332,12 @@ class AISignalsService:
                                 whatsapp_service.send_trading_signal(user.phone_number, signal)
 
                 print(f"Generated {len(new_signals)} high-probability signals (min {self.min_probability_threshold}% win rate)")
-
+                
                 # Monitor active trades
                 active_trades = []
                 for user in store.users:
                     active_trades.extend(store.get_active_trades_for_user(user['id']))
-
+                
                 if active_trades:
                     trade_manager.monitor_active_trades(active_trades, nifty_data)
 
@@ -2678,28 +2678,28 @@ def take_trade():
     """User takes a trading signal"""
     if 'user_id' not in session:
         return jsonify({'error': 'Not authenticated'}), 401
-
+    
     data = request.get_json()
     signal_id = data.get('signal_id')
     quantity = data.get('quantity', 1)
     entry_price = data.get('entry_price')
-
+    
     if not signal_id or not entry_price:
         return jsonify({'error': 'Signal ID and entry price required'}), 400
-
+    
     # Find the signal
     signal = None
     for s in store.trading_signals:
         if s.id == signal_id:
             signal = s
             break
-
+    
     if not signal:
         return jsonify({'error': 'Signal not found'}), 404
-
+    
     # Create active trade
     trade = store.add_active_trade(signal_id, session['user_id'], entry_price, quantity)
-
+    
     return jsonify({
         'success': True,
         'trade': asdict(trade),
@@ -2711,22 +2711,22 @@ def get_active_trades():
     """Get user's active trades"""
     if 'user_id' not in session:
         return jsonify({'error': 'Not authenticated'}), 401
-
+    
     active_trades = store.get_active_trades_for_user(session['user_id'])
-
+    
     # Add signal details to each trade
     trades_with_signals = []
     for trade in active_trades:
         trade_dict = asdict(trade)
-
+        
         # Find corresponding signal
         for signal in store.trading_signals:
             if signal.id == trade.signal_id:
                 trade_dict['signal'] = asdict(signal)
                 break
-
+        
         trades_with_signals.append(trade_dict)
-
+    
     return jsonify(trades_with_signals)
 
 @app.route('/api/trades/<int:trade_id>/exit', methods=['POST'])
@@ -2734,26 +2734,26 @@ def exit_trade(trade_id):
     """Exit a trade"""
     if 'user_id' not in session:
         return jsonify({'error': 'Not authenticated'}), 401
-
+    
     data = request.get_json()
     exit_price = data.get('exit_price')
-
+    
     # Find and update trade
     for trade in store.active_trades:
         if trade.id == trade_id and trade.user_id == session['user_id']:
             trade.status = "EXITED"
             trade.current_ltp = exit_price
-
+            
             # Calculate final P&L
             trade.pnl = (exit_price - trade.entry_price) * trade.quantity
             trade.pnl_percent = (trade.pnl / (trade.entry_price * trade.quantity)) * 100
-
+            
             return jsonify({
                 'success': True,
                 'final_pnl': trade.pnl,
                 'final_pnl_percent': trade.pnl_percent
             })
-
+    
     return jsonify({'error': 'Trade not found'}), 404
 
 @app.route('/api/signals/high-probability')
@@ -2761,7 +2761,7 @@ def get_high_probability_signals():
     """Get only signals with high win probability"""
     min_prob = float(request.args.get('min_probability', 75))
     high_prob_signals = store.get_high_probability_signals(min_prob)
-
+    
     return jsonify({
         'signals': [asdict(s) for s in high_prob_signals],
         'count': len(high_prob_signals),
@@ -2776,10 +2776,10 @@ def test_zerodha():
     data = request.get_json()
     api_key = data.get('api_key')
     access_token = data.get('access_token')
-
+    
     if not api_key or not access_token:
         return jsonify({'success': False, 'error': 'API key and access token required'}), 400
-
+    
     try:
         # Simulate API test - in real implementation, make actual API call
         headers = {
@@ -2802,10 +2802,10 @@ def test_whatsapp():
     data = request.get_json()
     access_token = data.get('access_token')
     phone_id = data.get('phone_id')
-
+    
     if not access_token or not phone_id:
         return jsonify({'success': False, 'error': 'Access token and phone ID required'}), 400
-
+    
     try:
         # Simulate WhatsApp API test
         return jsonify({
@@ -2821,10 +2821,10 @@ def test_claude():
     """Test Claude AI API connection"""
     data = request.get_json()
     api_key = data.get('api_key')
-
+    
     if not api_key:
         return jsonify({'success': False, 'error': 'Claude API key required'}), 400
-
+    
     try:
         # Simulate Claude API test
         return jsonify({
@@ -2842,11 +2842,34 @@ def analytics_performance():
     active_trades = []
     for user in store.users:
         active_trades.extend(store.get_active_trades_for_user(user['id']))
-
+    
     total_signals = len(store.trading_signals)
     successful_signals = len([s for s in store.trading_signals if s.confidence > 80])
     success_rate = (successful_signals / total_signals * 100) if total_signals > 0 else 0
-
+    
+    return jsonify({
+        'total_signals': total_signals,
+        'successful_signals': successful_signals,
+        'success_rate': round(success_rate, 1),
+        'active_trades': len(active_trades),
+        'win_rate': 87.5,
+        'risk_reward_ratio': 2.3,
+        'recent_performance': {
+            'last_7_days': 12.4,
+            'last_30_days': 45.2,
+            'total_trades': 156
+        }
+    })</old_str>
+def analytics_performance():
+    """Get analytics and performance data"""
+    active_trades = []
+    for user in store.users:
+        active_trades.extend(store.get_active_trades_for_user(user['id']))
+    
+    total_signals = len(store.trading_signals)
+    successful_signals = len([s for s in store.trading_signals if s.confidence > 80])
+    success_rate = (successful_signals / total_signals * 100) if total_signals > 0 else 0
+    
     return jsonify({
         'total_signals': total_signals,
         'successful_signals': successful_signals,
