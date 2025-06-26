@@ -2746,7 +2746,7 @@ def exit_trade(trade_id):
 
             # Calculate final P&L
             trade.pnl = (exit_price - trade.entry_price) * trade.quantity
-            trade.pnl_percent = (trade.pnl / (trade.entry_price * trade.quantity)) * trade.quantity
+            trade.pnl_percent = (trade.pnl / (trade.entry_price * trade.quantity)) * 100
 
             return jsonify({
                 'success': True,
