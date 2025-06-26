@@ -3,21 +3,19 @@
 
 ## Overview
 
-This integration connects your NIFINOVA AI Trading Platform with Claude Desktop using Zerodha's Kite MCP protocol, enabling AI-powered trading through natural language commands.
+This integration connects your NIFINOVA AI Trading Platform with Claude Desktop using Zerodha's official Kite MCP server, enabling AI-powered trading through natural language commands.
 
 ## Setup Steps
 
-### 1. Configure Kite Connect API
+### 1. Authenticate with Kite Connect
 
-1. **Get Kite Connect API credentials:**
-   - Visit [Zerodha Developer Console](https://developers.zerodha.com/)
-   - Create a new app and get API key and secret
-   - Generate access token using the authentication flow
+1. **Login to Kite Connect:**
+   - Use the provided authentication URL to login
+   - Complete the OAuth flow to get your session token
 
-2. **Set environment variables:**
-   ```bash
-   export ZERODHA_API_KEY="your_api_key_here"
-   export ZERODHA_ACCESS_TOKEN="your_access_token_here"
+2. **Authentication URL:**
+   ```
+   https://kite.zerodha.com/connect/login?api_key=kitemcp&v=3&redirect_params=session_id%3D0e712d6a-8155-4d21-9e53-5de289da5f60%7C1750955119.4P7yot0mscNAk8GWKIe7LghteVcRQ38sD1BR7UBU7mc%3D
    ```
 
 ### 2. Install Claude Desktop
@@ -35,17 +33,27 @@ This integration connects your NIFINOVA AI Trading Platform with Claude Desktop 
    cp claude_desktop_config.json ~/.config/Claude/claude_desktop_config.json
    ```
 
-2. **Update the configuration path:**
-   - Edit the `claude_desktop_config.json` file
-   - Update the path to point to your Repl's `kite_mcp_integration.py` file
+2. **The configuration uses Zerodha's official MCP server:**
+   ```json
+   {
+     "mcpServers": {
+       "kite": {
+         "command": "npx",
+         "args": ["mcp-remote", "https://mcp.kite.trade/sse"]
+       }
+     }
+   }
+   ```
 
-3. **Add your API credentials to the env section**
+### 4. Available Commands
 
-### 4. Start the MCP Server
-
-```bash
-python kite_mcp_integration.py
-```
+Once configured, you can use these commands in Claude Desktop:
+- Get portfolio information
+- Check positions
+- Get real-time quotes
+- Place orders (with confirmation)
+- Analyze options chains
+- Generate trading signals
 
 ### 5. Test in Claude Desktop
 

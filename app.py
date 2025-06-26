@@ -2519,8 +2519,12 @@ def remove_whatsapp_user(phone_number):
 def mcp_status():
     """Check MCP server integration status"""
     return jsonify({
-        'kite_mcp_enabled': bool(os.getenv('ZERODHA_API_KEY')),
+        'kite_mcp_enabled': True,
+        'server_type': 'Official Zerodha Kite MCP',
+        'server_url': 'https://mcp.kite.trade/sse',
         'claude_desktop_ready': os.path.exists('claude_desktop_config.json'),
+        'authentication_required': True,
+        'auth_url': 'https://kite.zerodha.com/connect/login?api_key=kitemcp&v=3',
         'tools_available': [
             'get_portfolio',
             'get_positions', 
@@ -2528,9 +2532,11 @@ def mcp_status():
             'place_order',
             'get_nifty_options_chain',
             'generate_ai_trading_signal',
-            'risk_analysis'
+            'risk_analysis',
+            'get_instruments',
+            'get_historical_data'
         ],
-        'integration_guide': 'Copy claude_desktop_config.json to Claude Desktop settings'
+        'integration_guide': 'Copy claude_desktop_config.json to Claude Desktop settings and authenticate via Kite Connect'
     })
 
 @app.route('/api/options-chain')

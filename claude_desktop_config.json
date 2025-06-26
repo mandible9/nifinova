@@ -1,13 +1,9 @@
 
 {
   "mcpServers": {
-    "kite-trading-assistant": {
-      "command": "python",
-      "args": ["kite_mcp_integration.py"],
-      "env": {
-        "ZERODHA_API_KEY": "",
-        "ZERODHA_ACCESS_TOKEN": ""
-      }
+    "kite": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://mcp.kite.trade/sse"]
     }
   }
 }
