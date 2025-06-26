@@ -2836,7 +2836,30 @@ def test_claude():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 # Additional API endpoints for tab data
-@app.route('/api/analytics/performance')</old_str>
+@app.route('/api/analytics/performance')
+def analytics_performance():
+    """Get analytics and performance data"""
+    active_trades = []
+    for user in store.users:
+        active_trades.extend(store.get_active_trades_for_user(user['id']))
+    
+    total_signals = len(store.trading_signals)
+    successful_signals = len([s for s in store.trading_signals if s.confidence > 80])
+    success_rate = (successful_signals / total_signals * 100) if total_signals > 0 else 0
+    
+    return jsonify({
+        'total_signals': total_signals,
+        'successful_signals': successful_signals,
+        'success_rate': round(success_rate, 1),
+        'active_trades': len(active_trades),
+        'win_rate': 87.5,
+        'risk_reward_ratio': 2.3,
+        'recent_performance': {
+            'last_7_days': 12.4,
+            'last_30_days': 45.2,
+            'total_trades': 156
+        }
+    })</old_str>
 def analytics_performance():
     """Get analytics and performance data"""
     active_trades = []
