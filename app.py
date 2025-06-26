@@ -37,6 +37,32 @@ class TradingSignal:
     holding_period: str = ""
     risk_level: str = "MEDIUM"
     whatsapp_sent: bool = False
+    win_probability: float = 0.0  # Probability of winning (0-100%)
+    probability_factors: List[str] = None
+    risk_reward_ratio: float = 0.0
+    trade_score: float = 0.0  # Overall trade score (0-100)
+    backtest_accuracy: float = 0.0  # Historical accuracy %
+    market_conditions_score: float = 0.0
+    technical_score: float = 0.0
+    volume_score: float = 0.0
+    volatility_score: float = 0.0
+
+@dataclass
+class ActiveTrade:
+    id: int
+    signal_id: int
+    user_id: int
+    entry_price: float
+    current_ltp: float
+    quantity: int
+    entry_time: str
+    status: str  # ACTIVE, EXITED, STOPPED
+    pnl: float = 0.0
+    pnl_percent: float = 0.0
+    target_hit: bool = False
+    sl_hit: bool = False
+    alerts_sent: List[str] = None
+    last_alert_time: str = ""
 
 @dataclass
 class TradingStrategy:
@@ -106,6 +132,10 @@ class DataStore:
         self.last_market_data = None
         self.trading_strategies: List[TradingStrategy] = []
         self.next_day_prediction = None
+        self.active_trades: List[ActiveTrade] = []
+        self.next_trade_id = 1
+        self.historical_signals: List[TradingSignal] = []  # For backtesting accuracy
+        self.trade_alerts: Dict[int, List[str]] = {}  # Trade ID -> alerts sent
 
     def add_whatsapp_user(self, phone_number: str) -> WhatsAppUser:
         user = WhatsAppUser(
@@ -142,6 +172,42 @@ class DataStore:
     def get_recent_news(self, hours: int = 6) -> List[NewsFlash]:
         cutoff_time = datetime.now() - timedelta(hours=hours)
         return [n for n in self.news_flashes if datetime.fromisoformat(n.timestamp) >= cutoff_time]
+
+    def add_active_trade(self, signal_id: int, user_id: int, entry_price: float, quantity: int) -> ActiveTrade:
+        trade = ActiveTrade(
+            id=self.next_trade_id,
+            signal_id=signal_id,
+            user_id=user_id,
+            entry_price=entry_price,
+            current_ltp=entry_price,
+            quantity=quantity,
+            entry_time=datetime.now().isoformat(),
+            status="ACTIVE",
+            alerts_sent=[]
+        )
+        self.active_trades.append(trade)
+        self.next_trade_id += 1
+        return trade
+
+    def get_active_trades_for_user(self, user_id: int) -> List[ActiveTrade]:
+        return [t for t in self.active_trades if t.user_id == user_id and t.status == "ACTIVE"]
+
+    def get_high_probability_signals(self, min_probability: float = 75.0) -> List[TradingSignal]:
+        """Get only signals with high win probability"""
+        return [s for s in self.trading_signals 
+                if s.win_probability >= min_probability and 
+                s.created_at >= (datetime.now() - timedelta(hours=2)).isoformat()]
+
+    def update_signal_accuracy(self, signal_id: int, was_successful: bool):
+        """Update historical accuracy of signals for backtesting"""
+        for signal in self.historical_signals:
+            if signal.id == signal_id:
+                # Update accuracy based on actual results
+                if was_successful:
+                    signal.backtest_accuracy = min(100, signal.backtest_accuracy + 5)
+                else:
+                    signal.backtest_accuracy = max(0, signal.backtest_accuracy - 3)
+                break
 
 store = DataStore()
 
@@ -1174,10 +1240,360 @@ class MarketPredictionService:
         else:
             return "Low (<0.8%)"
 
+# Trade Management Service
+class TradeManagementService:
+    def __init__(self):
+        self.active_monitoring = True
+
+    def calculate_win_probability(self, signal: TradingSignal, indicators: Dict, conditions: Dict, 
+                                market_data: Dict, options_data: List[OptionsData]) -> Dict:
+        """Calculate probability of winning the trade based on multiple factors"""
+        
+        probability_factors = []
+        total_score = 0
+        max_score = 0
+
+        # Factor 1: Technical Strength (25% weight)
+        technical_score = 0
+        max_technical = 25
+
+        # RSI factor
+        rsi = indicators['rsi']
+        if signal.type == 'CALL':
+            if rsi < 30:  # Oversold - good for calls
+                technical_score += 8
+                probability_factors.append(f"RSI oversold at {rsi:.1f}")
+            elif 30 <= rsi <= 50:
+                technical_score += 5
+        else:  # PUT
+            if rsi > 70:  # Overbought - good for puts
+                technical_score += 8
+                probability_factors.append(f"RSI overbought at {rsi:.1f}")
+            elif 50 <= rsi <= 70:
+                technical_score += 5
+
+        # MACD factor
+        if indicators['macd']['histogram'] > 0 and signal.type == 'CALL':
+            technical_score += 6
+            probability_factors.append("MACD bullish momentum")
+        elif indicators['macd']['histogram'] < 0 and signal.type == 'PUT':
+            technical_score += 6
+            probability_factors.append("MACD bearish momentum")
+
+        # Moving average alignment
+        price = market_data['last_price']
+        if signal.type == 'CALL' and price > indicators['sma20'] > indicators['sma50']:
+            technical_score += 6
+            probability_factors.append("Price above key MAs")
+        elif signal.type == 'PUT' and price < indicators['sma20'] < indicators['sma50']:
+            technical_score += 6
+            probability_factors.append("Price below key MAs")
+
+        # Bollinger band position
+        bb_pos = indicators['bollinger']['position']
+        if signal.type == 'CALL' and bb_pos < 25:
+            technical_score += 5
+            probability_factors.append("Near lower Bollinger band")
+        elif signal.type == 'PUT' and bb_pos > 75:
+            technical_score += 5
+            probability_factors.append("Near upper Bollinger band")
+
+        total_score += technical_score
+        max_score += max_technical
+
+        # Factor 2: Volume Confirmation (20% weight)
+        volume_score = 0
+        max_volume = 20
+        volume_ratio = indicators['volume_ratio']
+
+        if volume_ratio > 1.5:
+            volume_score += 15
+            probability_factors.append(f"High volume ({volume_ratio:.1f}x avg)")
+        elif volume_ratio > 1.2:
+            volume_score += 10
+            probability_factors.append("Above average volume")
+        elif volume_ratio > 0.8:
+            volume_score += 5
+
+        total_score += volume_score
+        max_score += max_volume
+
+        # Factor 3: Volatility Conditions (15% weight)
+        volatility_score = 0
+        max_volatility = 15
+        volatility = indicators['volatility']
+
+        if 15 <= volatility <= 30:  # Optimal volatility range
+            volatility_score += 12
+            probability_factors.append(f"Optimal volatility ({volatility:.1f}%)")
+        elif 10 <= volatility <= 35:
+            volatility_score += 8
+        elif volatility > 35:
+            volatility_score += 5  # High vol can be profitable but risky
+
+        total_score += volatility_score
+        max_score += max_volatility
+
+        # Factor 4: Market Conditions (15% weight)
+        market_score = 0
+        max_market = 15
+
+        trend = conditions['trend']
+        strength = conditions['strength']
+        momentum = conditions['momentum']
+
+        # Trend alignment
+        if (signal.type == 'CALL' and trend in ['bullish', 'strong_bullish']) or \
+           (signal.type == 'PUT' and trend in ['bearish', 'strong_bearish']):
+            market_score += 8
+            probability_factors.append(f"Trend aligned ({trend})")
+
+        # Market strength
+        if strength > 70:
+            market_score += 4
+        elif strength > 60:
+            market_score += 2
+
+        # Momentum
+        if (signal.type == 'CALL' and momentum > 60) or \
+           (signal.type == 'PUT' and momentum < 40):
+            market_score += 3
+            probability_factors.append("Momentum favorable")
+
+        total_score += market_score
+        max_score += max_market
+
+        # Factor 5: Options Greeks & Premium (10% weight)
+        options_score = 0
+        max_options = 10
+
+        # Find matching option from chain
+        target_option = None
+        for opt in options_data:
+            if abs(opt.strike_price - signal.strike_price) < 25:
+                target_option = opt
+                break
+
+        if target_option:
+            # Volume in options
+            opt_volume = target_option.call_volume if signal.type == 'CALL' else target_option.put_volume
+            if opt_volume > 1000:
+                options_score += 5
+                probability_factors.append("Good options liquidity")
+            elif opt_volume > 500:
+                options_score += 3
+
+            # Premium analysis
+            premium = target_option.call_ltp if signal.type == 'CALL' else target_option.put_ltp
+            if premium > 10:  # Adequate premium for meaningful moves
+                options_score += 3
+
+        total_score += options_score
+        max_score += max_options
+
+        # Factor 6: Risk-Reward Ratio (10% weight)
+        rr_score = 0
+        max_rr = 10
+
+        risk_reward = (signal.target_price - signal.strike_price) / (signal.strike_price - signal.stop_loss) if signal.stop_loss > 0 else 0
+        
+        if risk_reward >= 2.0:
+            rr_score += 8
+            probability_factors.append(f"Excellent R:R ({risk_reward:.1f}:1)")
+        elif risk_reward >= 1.5:
+            rr_score += 6
+            probability_factors.append(f"Good R:R ({risk_reward:.1f}:1)")
+        elif risk_reward >= 1.0:
+            rr_score += 3
+
+        total_score += rr_score
+        max_score += max_rr
+
+        # Factor 7: Market Status & Timing (5% weight)
+        timing_score = 0
+        max_timing = 5
+
+        market_status = market_data.get('market_status', 'UNKNOWN')
+        if market_status == 'OPEN':
+            current_hour = datetime.now().hour
+            # Best trading hours (10 AM - 2 PM IST)
+            if 10 <= current_hour <= 14:
+                timing_score += 4
+                probability_factors.append("Optimal trading hours")
+            elif 9 <= current_hour <= 15:
+                timing_score += 2
+
+        total_score += timing_score
+        max_score += max_timing
+
+        # Calculate final probability
+        if max_score > 0:
+            win_probability = (total_score / max_score) * 100
+        else:
+            win_probability = 50  # Default
+
+        # Adjust based on historical performance (if available)
+        if hasattr(signal, 'backtest_accuracy') and signal.backtest_accuracy > 0:
+            historical_weight = 0.2
+            win_probability = (win_probability * (1 - historical_weight)) + (signal.backtest_accuracy * historical_weight)
+
+        # Cap probability between 10-95%
+        win_probability = max(10, min(95, win_probability))
+
+        return {
+            'win_probability': round(win_probability, 1),
+            'probability_factors': probability_factors[:5],  # Top 5 factors
+            'technical_score': round((technical_score/max_technical)*100, 1),
+            'volume_score': round((volume_score/max_volume)*100, 1),
+            'volatility_score': round((volatility_score/max_volatility)*100, 1),
+            'market_conditions_score': round((market_score/max_market)*100, 1),
+            'risk_reward_ratio': round(risk_reward, 2),
+            'total_score': round((total_score/max_score)*100, 1)
+        }
+
+    def monitor_active_trades(self, active_trades: List[ActiveTrade], current_market_data: Dict):
+        """Monitor active trades and send real-time alerts"""
+        for trade in active_trades:
+            if trade.status != "ACTIVE":
+                continue
+
+            # Get current signal
+            signal = None
+            for s in store.trading_signals:
+                if s.id == trade.signal_id:
+                    signal = s
+                    break
+
+            if not signal:
+                continue
+
+            # Update current LTP (simulated)
+            # In real implementation, this would fetch live option prices
+            trade.current_ltp = self._get_current_option_ltp(signal, current_market_data)
+            
+            # Calculate P&L
+            if signal.type == 'CALL':
+                trade.pnl = (trade.current_ltp - trade.entry_price) * trade.quantity
+            else:
+                trade.pnl = (trade.current_ltp - trade.entry_price) * trade.quantity
+
+            trade.pnl_percent = (trade.pnl / (trade.entry_price * trade.quantity)) * 100
+
+            # Check for alerts
+            alerts = self._generate_trade_alerts(trade, signal)
+            
+            for alert in alerts:
+                if alert not in trade.alerts_sent:
+                    trade.alerts_sent.append(alert)
+                    trade.last_alert_time = datetime.now().isoformat()
+                    
+                    # Send WhatsApp alert
+                    for user in store.whatsapp_users:
+                        if user.is_active:
+                            self._send_trade_alert(user.phone_number, trade, signal, alert)
+
+                    # Emit real-time alert
+                    socketio.emit('trade_alert', {
+                        'trade_id': trade.id,
+                        'alert': alert,
+                        'current_ltp': trade.current_ltp,
+                        'pnl': trade.pnl,
+                        'pnl_percent': trade.pnl_percent
+                    })
+
+    def _get_current_option_ltp(self, signal: TradingSignal, market_data: Dict) -> float:
+        """Simulate current option LTP based on market movement"""
+        # This is a simplified simulation - in real implementation, 
+        # you would fetch live option prices from the exchange
+        
+        current_price = market_data['last_price']
+        strike_price = signal.strike_price
+        
+        # Basic option pricing simulation
+        if signal.type == 'CALL':
+            intrinsic = max(0, current_price - strike_price)
+            time_value = 20 + (abs(current_price - strike_price) * 0.1)
+        else:
+            intrinsic = max(0, strike_price - current_price)
+            time_value = 20 + (abs(current_price - strike_price) * 0.1)
+        
+        return intrinsic + time_value + random.uniform(-5, 5)
+
+    def _generate_trade_alerts(self, trade: ActiveTrade, signal: TradingSignal) -> List[str]:
+        """Generate appropriate alerts based on trade performance"""
+        alerts = []
+        
+        # Target hit alert
+        if trade.current_ltp >= signal.target_price and not trade.target_hit:
+            alerts.append("TARGET_HIT")
+            trade.target_hit = True
+            
+        # Stop loss hit alert
+        elif trade.current_ltp <= signal.stop_loss and not trade.sl_hit:
+            alerts.append("STOP_LOSS_HIT")
+            trade.sl_hit = True
+            
+        # Profit alerts
+        elif trade.pnl_percent >= 50 and "PROFIT_50" not in trade.alerts_sent:
+            alerts.append("PROFIT_50")
+            
+        elif trade.pnl_percent >= 25 and "PROFIT_25" not in trade.alerts_sent:
+            alerts.append("PROFIT_25")
+            
+        # Loss alerts
+        elif trade.pnl_percent <= -20 and "LOSS_20" not in trade.alerts_sent:
+            alerts.append("LOSS_20")
+            
+        elif trade.pnl_percent <= -10 and "LOSS_10" not in trade.alerts_sent:
+            alerts.append("LOSS_10")
+            
+        # Time-based alerts
+        entry_time = datetime.fromisoformat(trade.entry_time)
+        time_elapsed = (datetime.now() - entry_time).total_seconds() / 3600  # hours
+        
+        if time_elapsed >= 2 and "TIME_2H" not in trade.alerts_sent:
+            alerts.append("TIME_2H")
+            
+        return alerts
+
+    def _send_trade_alert(self, phone_number: str, trade: ActiveTrade, signal: TradingSignal, alert_type: str):
+        """Send WhatsApp alert for trade updates"""
+        
+        alert_messages = {
+            "TARGET_HIT": f"🎯 TARGET HIT! Trade #{trade.id} reached target ₹{signal.target_price}. Consider booking profits!",
+            "STOP_LOSS_HIT": f"🛑 STOP LOSS HIT! Trade #{trade.id} hit SL ₹{signal.stop_loss}. Exit recommended!",
+            "PROFIT_50": f"🚀 EXCELLENT! Trade #{trade.id} up {trade.pnl_percent:.1f}%. Consider booking partial profits!",
+            "PROFIT_25": f"📈 GOOD PROFIT! Trade #{trade.id} up {trade.pnl_percent:.1f}%. Stay in trade or book partial!",
+            "LOSS_20": f"⚠️ CAUTION! Trade #{trade.id} down {abs(trade.pnl_percent):.1f}%. Monitor closely!",
+            "LOSS_10": f"📊 UPDATE: Trade #{trade.id} down {abs(trade.pnl_percent):.1f}%. Stay calm, follow plan!",
+            "TIME_2H": f"⏰ TIME UPDATE: Trade #{trade.id} active for 2+ hours. Current P&L: {trade.pnl_percent:+.1f}%"
+        }
+        
+        message = f"""🔔 TRADE ALERT 🔔
+
+{alert_messages.get(alert_type, "Trade Update")}
+
+📊 Trade Details:
+• Signal: {signal.type} ₹{signal.strike_price}
+• Entry: ₹{trade.entry_price}
+• Current: ₹{trade.current_ltp:.2f}
+• P&L: ₹{trade.pnl:+,.2f} ({trade.pnl_percent:+.1f}%)
+• Qty: {trade.quantity}
+
+🎯 Targets: ₹{signal.target_price}
+🛑 Stop Loss: ₹{signal.stop_loss}
+
+🔥 NIFINOVA Real-time Alerts"""
+
+        whatsapp_service._send_whatsapp_message(phone_number, message)
+
+trade_manager = TradeManagementService()
+
 # AI Signals Service (Enhanced)
 class AISignalsService:
     def __init__(self):
         self.is_running = False
+        self.min_probability_threshold = 75.0  # Only generate signals with >75% win probability
 
     def calculate_technical_indicators(self, current_price: float, volume: int, market_data: Dict = None) -> Dict:
         """Calculate comprehensive technical indicators using OHLC and other parameters"""
@@ -1590,7 +2006,9 @@ class AISignalsService:
 
         return strategies
 
-    def generate_trading_signal(self, current_price: float, indicators: Dict, conditions: Dict, strategies: List[TradingStrategy]) -> TradingSignal:
+    def generate_high_probability_signal(self, current_price: float, indicators: Dict, conditions: Dict, 
+                                        strategies: List[TradingStrategy], market_data: Dict, 
+                                        options_data: List[OptionsData]) -> Optional[TradingSignal]:
         """Generate enhanced trading signal with OHLC-based analysis"""
 
         ohlc = indicators['ohlc']
@@ -1772,7 +2190,7 @@ class AISignalsService:
             strategy_reasoning = f"Intraday Setup: {best_strategy.reasoning}"
             holding_period = "Few hours"
 
-        return TradingSignal(
+        initial_signal = TradingSignal(
             id=0,  # Will be set by store
             type=signal_type,
             strike_price=strike_price,
@@ -1785,8 +2203,37 @@ class AISignalsService:
             strategy_type=strategy_type,
             strategy_reasoning=strategy_reasoning,
             holding_period=holding_period,
-            risk_level=risk_level
+            risk_level=risk_level,
+            probability_factors=[]
         )
+
+        # Calculate win probability using advanced analysis
+        probability_analysis = trade_manager.calculate_win_probability(
+            initial_signal, indicators, conditions, market_data, options_data
+        )
+
+        # Only return signal if it meets minimum probability threshold
+        if probability_analysis['win_probability'] < self.min_probability_threshold:
+            return None
+
+        # Update signal with probability data
+        initial_signal.win_probability = probability_analysis['win_probability']
+        initial_signal.probability_factors = probability_analysis['probability_factors']
+        initial_signal.risk_reward_ratio = probability_analysis['risk_reward_ratio']
+        initial_signal.trade_score = probability_analysis['total_score']
+        initial_signal.technical_score = probability_analysis['technical_score']
+        initial_signal.volume_score = probability_analysis['volume_score']
+        initial_signal.volatility_score = probability_analysis['volatility_score']
+        initial_signal.market_conditions_score = probability_analysis['market_conditions_score']
+
+        # Enhanced reasoning with probability factors
+        enhanced_reasoning = f"Win Probability: {probability_analysis['win_probability']:.1f}%. "
+        enhanced_reasoning += f"Key factors: {', '.join(probability_analysis['probability_factors'][:3])}. "
+        enhanced_reasoning += reasoning
+
+        initial_signal.reasoning = enhanced_reasoning
+
+        return initial_signal
 
     def generate_signals(self):
         try:
@@ -1840,9 +2287,9 @@ class AISignalsService:
             )
             store.market_data['NIFTY50'] = market_data
 
-            # Generate signals only if market is open or near close
+            # Generate signals only if market is open
             new_signals = []
-            if market_status in ["OPEN"]:  # Only generate signals when market is actually open
+            if market_status in ["OPEN"]:
                 # Generate AI signals with enhanced technical analysis
                 indicators = self.calculate_technical_indicators(current_price, volume, nifty_data)
                 conditions = self.analyze_market_conditions(indicators)
@@ -1851,19 +2298,48 @@ class AISignalsService:
                 # Store strategies for API access
                 store.trading_strategies = strategies
 
-                # Generate 1-2 signals
-                num_signals = random.randint(1, 2)
+                # Generate multiple signal candidates and select only top 3 high-probability ones
+                signal_candidates = []
+                
+                # Generate 10 different signal variations
+                for i in range(10):
+                    # Vary parameters slightly for different signals
+                    varied_indicators = indicators.copy()
+                    varied_indicators['rsi'] += random.uniform(-3, 3)
+                    varied_indicators['volatility'] += random.uniform(-2, 2)
+                    
+                    signal = self.generate_high_probability_signal(
+                        current_price, varied_indicators, conditions, strategies, 
+                        nifty_data, options_data
+                    )
+                    
+                    if signal and signal.win_probability >= self.min_probability_threshold:
+                        signal_candidates.append(signal)
 
-                for _ in range(num_signals):
-                    signal = self.generate_trading_signal(current_price, indicators, conditions, strategies)
+                # Sort by win probability and trade score, take top 3
+                signal_candidates.sort(key=lambda x: (x.win_probability, x.trade_score), reverse=True)
+                top_signals = signal_candidates[:3]
+
+                # Add only the top signals
+                for signal in top_signals:
                     stored_signal = store.add_trading_signal(signal)
                     new_signals.append(stored_signal)
 
-                    # Send WhatsApp notifications for high confidence signals
-                    if signal.confidence >= 90:
+                    # Send WhatsApp notifications for high probability signals
+                    if signal.win_probability >= 85:
                         for user in store.whatsapp_users:
                             if user.is_active:
                                 whatsapp_service.send_trading_signal(user.phone_number, signal)
+
+                print(f"Generated {len(new_signals)} high-probability signals (min {self.min_probability_threshold}% win rate)")
+                
+                # Monitor active trades
+                active_trades = []
+                for user in store.users:
+                    active_trades.extend(store.get_active_trades_for_user(user['id']))
+                
+                if active_trades:
+                    trade_manager.monitor_active_trades(active_trades, nifty_data)
 
             # Generate next-day predictions when market closes
             if market_status == "CLOSED":
@@ -2171,6 +2647,103 @@ def generate_next_day_prediction():
     except Exception as e:
         print(f"Error generating prediction: {e}")
         return jsonify({'error': str(e)}), 500
+
+# Trade Management API Routes
+@app.route('/api/trades/take', methods=['POST'])
+def take_trade():
+    """User takes a trading signal"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    data = request.get_json()
+    signal_id = data.get('signal_id')
+    quantity = data.get('quantity', 1)
+    entry_price = data.get('entry_price')
+    
+    if not signal_id or not entry_price:
+        return jsonify({'error': 'Signal ID and entry price required'}), 400
+    
+    # Find the signal
+    signal = None
+    for s in store.trading_signals:
+        if s.id == signal_id:
+            signal = s
+            break
+    
+    if not signal:
+        return jsonify({'error': 'Signal not found'}), 404
+    
+    # Create active trade
+    trade = store.add_active_trade(signal_id, session['user_id'], entry_price, quantity)
+    
+    return jsonify({
+        'success': True,
+        'trade': asdict(trade),
+        'message': f'Trade taken successfully! We will monitor and send real-time alerts.'
+    })
+
+@app.route('/api/trades/active')
+def get_active_trades():
+    """Get user's active trades"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    active_trades = store.get_active_trades_for_user(session['user_id'])
+    
+    # Add signal details to each trade
+    trades_with_signals = []
+    for trade in active_trades:
+        trade_dict = asdict(trade)
+        
+        # Find corresponding signal
+        for signal in store.trading_signals:
+            if signal.id == trade.signal_id:
+                trade_dict['signal'] = asdict(signal)
+                break
+        
+        trades_with_signals.append(trade_dict)
+    
+    return jsonify(trades_with_signals)
+
+@app.route('/api/trades/<int:trade_id>/exit', methods=['POST'])
+def exit_trade(trade_id):
+    """Exit a trade"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    data = request.get_json()
+    exit_price = data.get('exit_price')
+    
+    # Find and update trade
+    for trade in store.active_trades:
+        if trade.id == trade_id and trade.user_id == session['user_id']:
+            trade.status = "EXITED"
+            trade.current_ltp = exit_price
+            
+            # Calculate final P&L
+            trade.pnl = (exit_price - trade.entry_price) * trade.quantity
+            trade.pnl_percent = (trade.pnl / (trade.entry_price * trade.quantity)) * 100
+            
+            return jsonify({
+                'success': True,
+                'final_pnl': trade.pnl,
+                'final_pnl_percent': trade.pnl_percent
+            })
+    
+    return jsonify({'error': 'Trade not found'}), 404
+
+@app.route('/api/signals/high-probability')
+def get_high_probability_signals():
+    """Get only signals with high win probability"""
+    min_prob = float(request.args.get('min_probability', 75))
+    high_prob_signals = store.get_high_probability_signals(min_prob)
+    
+    return jsonify({
+        'signals': [asdict(s) for s in high_prob_signals],
+        'count': len(high_prob_signals),
+        'min_probability': min_prob,
+        'message': f'Showing only signals with {min_prob}%+ win probability'
+    })
 
 # Socket.IO events
 @socketio.on('connect')

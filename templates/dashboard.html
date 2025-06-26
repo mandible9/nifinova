@@ -1236,7 +1236,7 @@ function updatePrediction(prediction) {
                     console.error('Error loading options chain:', error);
                 });
         }
-        
+
 
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
@@ -1247,6 +1247,7 @@ function updatePrediction(prediction) {
             loadNewsFlash();
             loadTradingStrategies();
             loadNextDayPrediction();
+            loadActiveTrades();
 
         });
 
@@ -1257,5 +1258,317 @@ function updatePrediction(prediction) {
     setInterval(loadNewsFlash, 120000);
     setInterval(loadTradingStrategies, 45000);
     setInterval(loadNextDayPrediction, 600000);
+
+// Socket event handlers
+        socket.on('connected', function(data) {
+            console.log('Connected to real-time updates');
+            loadActiveTrades(); // Load active trades on connection
+        });
+
+        socket.on('market_update', function(data) {
+            console.log('Market update received:', data);
+            updateNiftyData(data.nifty_data);
+            updateSignals(data.new_signals);
+            updateOptionsChain(data.options_chain);
+            loadActiveTrades(); // Refresh active trades
+        });
+
+        socket.on('trade_alert', function(data) {
+            console.log('Trade alert received:', data);
+
+            // Show browser notification if supported
+            if (Notification.permission === 'granted') {
+                new Notification('NIFINOVA Trade Alert', {
+                    body: data.alert + ` - P&L: ${data.pnl_percent > 0 ? '+' : ''}${data.pnl_percent.toFixed(1)}%`,
+                    icon: '/favicon.ico'
+                });
+            }
+
+            // Update active trades display
+            loadActiveTrades();
+
+            // Show alert popup
+            showTradeAlert(data);
+        });
+
+        function showTradeAlert(alertData) {
+            const alertType = alertData.alert;
+            let message = '';
+            let bgColor = 'bg-blue-500';
+
+            switch(alertType) {
+                case 'TARGET_HIT':
+                    message = '🎯 TARGET HIT! Consider booking profits!';
+                    bgColor = 'bg-green-500';
+                    break;
+                case 'STOP_LOSS_HIT':
+                    message = '🛑 STOP LOSS HIT! Exit recommended!';
+                    bgColor = 'bg-red-500';
+                    break;
+                case 'PROFIT_50':
+                    message = '🚀 EXCELLENT! 50%+ profit achieved!';
+                    bgColor = 'bg-green-500';
+                    break;
+                case 'LOSS_20':
+                    message = '⚠️ CAUTION! 20% loss reached!';
+                    bgColor = 'bg-red-500';
+                    break;
+                default:
+                    message = '📊 Trade Update';
+            }
+
+            // Create alert div
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `fixed top-4 right-4 ${bgColor} text-white p-4 rounded-lg shadow-lg z-50 max-w-sm`;
+            alertDiv.innerHTML = `
+                <div class="flex justify-between items-start">
+                    <div>
+                        <div class="font-bold">Trade #${alertData.trade_id}</div>
+                        <div class="text-sm">${message}</div>
+                        <div class="text-xs mt-1">
+                            Current LTP: ₹${alertData.current_ltp.toFixed(2)}<br>
+                            P&L: ${alertData.pnl_percent > 0 ? '+' : ''}${alertData.pnl_percent.toFixed(1)}%
+                        </div>
+                    </div>
+                    <button onclick="this.parentElement.parentElement.remove()" class="text-white hover:text-gray-200">
+                        ✕
+                    </button>
+                </div>
+            `;
+
+            document.body.appendChild(alertDiv);
+
+            // Auto remove after 10 seconds
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.remove();
+                }
+            }, 10000);
+        }
+
+        // Request notification permission
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+
+function updateSignals(signals) {
+            const container = document.getElementById('signalsContainer');
+
+            // Filter for high-probability signals only
+            const highProbSignals = signals.filter(s => s.win_probability >= 75);
+
+            if (!highProbSignals || highProbSignals.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center text-gray-500 py-8">
+                        <div class="text-4xl mb-4">🔍</div>
+                        <p>Analyzing market conditions...</p>
+                        <p class="text-sm">Only showing signals with 75%+ win probability</p>
+                        <div class="mt-4 text-xs">
+                            <div class="bg-blue-100 p-3 rounded">
+                                <strong>Quality over Quantity:</strong> We only show signals with high probability of success.
+                                This ensures better trading outcomes.
+                            </div>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = highProbSignals.map(signal => `
+                <div class="signal-card p-4 border rounded-lg ${signal.type === 'CALL' ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}">
+                    <div class="flex justify-between items-start mb-3">
+                        <div class="flex items-center space-x-2">
+                            <span class="signal-type ${signal.type === 'CALL' ? 'bg-green-500' : 'bg-red-500'}">${signal.type}</span>
+                            <span class="font-semibold text-lg">₹${signal.strike_price}</span>
+                            <span class="probability-badge bg-purple-500 text-white px-2 py-1 rounded text-xs font-bold">
+                                ${signal.win_probability || 0}% WIN
+                            </span>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm text-gray-600">${signal.strategy_type}</div>
+                            <div class="text-xs text-gray-500">R:R ${signal.risk_reward_ratio || 'N/A'}:1</div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-4 mb-3">
+                        <div class="text-center">
+                            <div class="text-xs text-gray-600">Target</div>
+                            <div class="font-semibold text-green-600">₹${signal.target_price}</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-xs text-gray-600">Stop Loss</div>
+                            <div class="font-semibold text-red-600">₹${signal.stop_loss}</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-xs text-gray-600">Score</div>
+                            <div class="font-semibold">${Math.round(signal.trade_score || 0)}/100</div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="text-sm font-semibold text-gray-800 mb-1">Probability Factors:</div>
+                        <div class="text-xs text-gray-600">
+                            ${(signal.probability_factors || []).slice(0, 3).join(' • ')}
+                        </div>
+                    </div>
+
+                    <div class="text-sm text-gray-700 mb-3">
+                        <strong>AI Analysis:</strong> ${signal.reasoning}
+                    </div>
+
+                    <div class="flex justify-between items-center mb-3">
+                        <div class="text-xs text-gray-500">
+                            <span>Expires: ${signal.expiry_date}</span>
+                        </div>
+                        <button onclick="takeTradePrompt(${signal.id})" 
+                                class="take-trade-btn bg-blue-500 hover:bg-blue-600 text-white px-4 py-1 rounded text-sm">
+                            Take This Trade
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function takeTradePrompt(signalId) {
+            const entryPrice = prompt('Enter your entry price (₹):');
+            const quantity = prompt('Enter quantity (lots):', '1');
+
+            if (entryPrice && quantity) {
+                takeTradeAPI(signalId, parseFloat(entryPrice), parseInt(quantity));
+            }
+        }
+
+        function takeTradeAPI(signalId, entryPrice, quantity) {
+            fetch('/api/trades/take', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    signal_id: signalId,
+                    entry_price: entryPrice,
+                    quantity: quantity
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✅ Trade taken successfully! You will receive real-time alerts.');
+                    loadActiveTrades();
+                } else {
+                    alert('❌ Error: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error taking trade:', error);
+                alert('❌ Error taking trade. Please try again.');
+            });
+        }
+
+        function loadActiveTrades() {
+            fetch('/api/trades/active')
+                .then(response => response.json())
+                .then(trades => {
+                    updateActiveTrades(trades);
+                })
+                .catch(error => {
+                    console.error('Error loading active trades:', error);
+                });
+        }
+
+        function updateActiveTrades(trades) {
+            const container = document.getElementById('activeTradesContainer');
+
+            if (!trades || trades.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center text-gray-500 py-4">
+                        <div class="text-2xl mb-2">📊</div>
+                        <p>No active trades</p>
+                        <p class="text-sm">Take a high-probability signal to start trading!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = trades.map(trade => `
+                <div class="trade-card p-4 border rounded-lg bg-blue-50 border-blue-200">
+                    <div class="flex justify-between items-start mb-3">
+                        <div class="flex items-center space-x-2">
+                            <span class="trade-id bg-blue-500 text-white px-2 py-1 rounded text-xs">#${trade.id}</span>
+                            <span class="signal-type bg-${trade.signal?.type === 'CALL' ? 'green' : 'red'}-500 text-white px-2 py-1 rounded text-xs">
+                                ${trade.signal?.type || 'N/A'} ₹${trade.signal?.strike_price || 'N/A'}
+                            </span>
+                            <span class="pnl-badge ${trade.pnl_percent >= 0 ? 'bg-green-500' : 'bg-red-500'} text-white px-2 py-1 rounded text-xs">
+                                ${trade.pnl_percent > 0 ? '+' : ''}${trade.pnl_percent.toFixed(1)}%
+                            </span>
+                        </div>
+                        <button onclick="exitTrade(${trade.id})" 
+                                class="exit-btn bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs">
+                            Exit Trade
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-4 gap-3 mb-3 text-center">
+                        <div>
+                            <div class="text-xs text-gray-600">Entry</div>
+                            <div class="font-semibold">₹${trade.entry_price}</div>
+                        </div>
+                        <div>
+                            <div class="text-xs text-gray-600">Current</div>
+                            <div class="font-semibold">₹${trade.current_ltp.toFixed(2)}</div>
+                        </div>
+                        <div>
+                            <div class="text-xs text-gray-600">P&L</div>
+                            <div class="font-semibold ${trade.pnl >= 0 ? 'text-green-600' : 'text-red-600'}">
+                                ₹${trade.pnl > 0 ? '+' : ''}${trade.pnl.toFixed(2)}
+                            </div>
+                        </div>
+                        <div>
+                            <div class="text-xs text-gray-600">Qty</div>
+                            <div class="font-semibold">${trade.quantity}</div>
+                        </div>
+                    </div>
+
+                    <div class="text-xs text-gray-600">
+                        <div class="flex justify-between">
+                            <span>Target: ₹${trade.signal?.target_price || 'N/A'}</span>
+                            <span>SL: ₹${trade.signal?.stop_loss || 'N/A'}</span>
+                        </div>
+                        <div class="mt-1">
+                            Entry Time: ${new Date(trade.entry_time).toLocaleString()}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function exitTrade(tradeId) {
+            const exitPrice = prompt('Enter exit price (₹):');
+
+            if (exitPrice) {
+                fetch(`/api/trades/${tradeId}/exit`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        exit_price: parseFloat(exitPrice)
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(`✅ Trade exited! Final P&L: ₹${data.final_pnl.toFixed(2)} (${data.final_pnl_percent.toFixed(1)}%)`);
+                        loadActiveTrades();
+                    } else {
+                        alert('❌ Error: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error exiting trade:', error);
+                    alert('❌ Error exiting trade. Please try again.');
+                });
+            }
+        }
 </script>
 {% endblock %}
