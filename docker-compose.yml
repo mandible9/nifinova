@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  nifty-ai-trading:
+    build: .
+    container_name: nifty-ai-trading-app
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - PYTHONUNBUFFERED=1
+      # Add your API keys here or use .env file
+      - ZERODHA_API_KEY=${ZERODHA_API_KEY:-}
+      - ZERODHA_ACCESS_TOKEN=${ZERODHA_ACCESS_TOKEN:-}
+      - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN:-}
+      - WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID:-}
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - nifty-network
+
+networks:
+  nifty-network:
+    driver: bridge
+
+volumes:
+  logs:
+  data:

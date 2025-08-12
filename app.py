@@ -2859,7 +2859,7 @@ def analytics_performance():
             'last_30_days': 45.2,
             'total_trades': 156
         }
-    })</old_str>
+    })
 def analytics_performance():
     """Get analytics and performance data"""
     active_trades = []
